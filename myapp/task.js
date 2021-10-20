@@ -10,6 +10,15 @@ let litresText=''
 let maintenanceMode=false
 let blink=false
 
+let price=99
+let priceText=''
+
+let dateText=''
+let timeText=''
+let digiCount=0
+let setDate=true
+let index=0
+
 // test user rfid
 const users = [ 
   {tag: '0443770628', name: 'Jone', userId: '1122334455', password:'1234'},
@@ -17,8 +26,16 @@ const users = [
 ]
 
 const maintenanceMenu = [
-	'                ',
-	'Exit            ',
+	'Set oil price',
+	'Set date time',
+	'Add users',
+	'Test control M/B',
+	'Ping control M/B',
+	'Tank volume',
+	'Flow K volume',
+	'Clear/reset',
+	'Reboot',
+	'Exit',
 ]
 let menuCount=0
 
@@ -226,13 +243,6 @@ const checkKey = (col) => {
 			}
 		break
 
-		case 'maintenance-to':
-			switch(key) {
-				case '*': return task('ready'); break;
-				case '#': maintenanceMode=true; return task('maintenance-menu'); break;
-			}
-		break
-
 		case 'fill-select':
 			switch(key) {
 				case '1': task('fill-bath-select'); break;
@@ -273,6 +283,7 @@ const checkKey = (col) => {
 				task('timeout')
 			}, 10*1000)	
 		break
+
 		case 'fill-bath-confirm':
 			switch(key) {
 				case '*': return task('ready'); break;
@@ -305,11 +316,194 @@ const checkKey = (col) => {
 				task('timeout')
 			}, 10*1000)	
 		break
+
 		case 'fill-litres-confirm':
 			switch(key) {
 				case '*': return task('ready'); break;
 				case '#': return task('fill-litres'); break;
 			}
+		break
+
+		case 'maintenance-to':
+			switch(key) {
+				case '*': return task('ready'); break;
+				case '#': maintenanceMode=true; return task('password'); break;
+			}
+		break
+
+		case 'maintenance-menu': 
+			switch(key) {
+				case '*': if(++menuCount >= maintenanceMenu.length) menuCount=0; break;
+				case '#': 
+					switch(maintenanceMenu[menuCount]) {
+						case 'Set oil price': return task('Set-oil-price'); break;
+						case 'Set date time': return task('Set-date-time'); break;
+						case 'Add users': return task('Add users'); break;
+						case 'Test control M/B': return task('Test-control-M/B'); break;
+						case 'Ping control M/B': return task('Ping-control-M/B'); break;
+						case 'Tank volume': return task('Tank-volume'); break;
+						case 'Flow K volume': return task('Flow-K-volume'); break;
+						case 'Clear/reset': return task('Clear/reset'); break;
+						case 'Reboot': return task('Reboot'); break;
+						case 'Exit': return task('ready'); break;
+						break;
+					}
+				break;
+			}
+
+			lcd.printLineSync(0, maintenanceMenu[menuCount].padEnd(16, ' '));
+			// lcd.printLineSync(1, 'NEXT(*)    OK(#)');
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, 10*1000)	
+		break;
+
+		case 'Set-oil-price':
+			switch(key) {
+				case '*': 
+					if(priceText.length) priceText = priceText.slice(0, -1); 
+					else return task('ready'); 
+				break;
+				case '#': 
+					if(priceText.length) {
+						price = priceText*1
+						return task('done'); 
+					}
+				break;
+				case '1': case '2': case '3': case '4': case '5': 
+				case '6': case '7': case '8': case '9': case '0': 
+					if(priceText.length<2) priceText += key
+				break;
+			}
+
+			lcd.printLineSync(0, 'Price/Litres> '+priceText.padStart(2, ' '));
+			if(!priceText.length) lcd.printLineSync(1, 'EXIT(*)    OK(#)');
+			else lcd.printLineSync(1, 'CLEAR(*)   OK(#)');
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{				
+				task('timeout')
+			}, 30*1000)	
+		break
+
+		case 'Reboot': 
+			switch(key) {
+				case '*': return task('maintenance-menu'); break;
+				case '#': 
+					console.log('Reboot')
+					lcd.printLineSync(0, '   Reboot now   ');
+					lcd.printLineSync(1, '       ...      ');
+					timeoutMenu = setTimeout(()=>{
+						var exec = require('child_process').exec;
+						exec('sudo reboot', function(error, stdout, stderr){ 
+							console.log('Reboot:',error, stdout, stderr)
+						});
+					}, 1*1000)	
+				break;
+			}			
+		break;
+
+		case 'Set-date-time':
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{				
+				task('timeout')
+			}, 30*1000)	
+
+			switch(key) {
+				case '*': 
+					if(setDate) {setDate=false; digiCount=0; index=0}
+					else {setDate=true; digiCount=0; index=0}
+				break;
+				case '#': 
+					const dateArr = dateText.split('/')
+					const dateSet = dateArr[2]+'-'+dateArr[1]+'-'+dateArr[0]+' '+timeText
+					console.log('dateSet', dateSet)
+					{
+					var exec = require('child_process').exec; 
+					exec('sudo timedatectl set-ntp false', function(error, stdout, stderr){ 
+						console.log('set-ntp false:',error, stdout, stderr)
+						exec('sudo timedatectl set-time "'+dateSet+'"', function(error, stdout, stderr){ 
+							console.log('set-time:',error, stdout, stderr)
+							// return task('done');
+						});
+					});
+					}
+					return task('done');
+				break;
+				case '1': case '2': case '3': case '4': case '5': 
+				case '6': case '7': case '8': case '9': case '0':
+					switch(digiCount) {
+						case 0:
+							if(setDate) {
+								if( (key*1) > 3) return; // set date
+							}
+							else {
+								if( (key*1) > 2) return; //set time	
+							}							
+						break;
+						case 1:
+							if(setDate) {
+								if(dateText[0]==='3') {
+									if( (key*1) > 1) return; // set date
+								}								
+							}
+							else {
+								if(timeText[0]==='2') {
+									if( (key*1) >= 4) return; // set time
+								}	
+							}							
+						break;
+						case 2:
+							if(setDate) {
+								if( (key*1) > 1) return; // set date
+							}
+							else {
+								if( (key*1) > 5) return; //set time	
+							}							
+						break;
+						case 3:
+							if(setDate) {
+								if(dateText[3]==='1') {
+									if( (key*1) > 2) return; // set date
+								}								
+							}						
+						break;
+						case 4:
+							if(setDate) {
+								if( (key*1) > 2) return; // set date
+							}
+							else {
+								if( (key*1) > 5) return; //set time	
+							}							
+						break;
+					}
+
+					if(digiCount>3) index=digiCount+2
+					else if(digiCount>1) index=digiCount+1
+					else index=digiCount
+					
+					if(setDate) {						
+						dateText = dateText.substring(0, index) + key + dateText.substring(index + 1);
+						if(++digiCount>7) digiCount=0
+					}
+					else {						
+						timeText = timeText.substring(0, index) + key + timeText.substring(index + 1);
+						if(++digiCount>5) digiCount=0
+					}
+
+					// set index blink
+					if(index>3) index=digiCount+2
+					else if(index>=1) index=digiCount+1
+					else index=digiCount
+
+					if(!digiCount) index=0
+					// console.log('digiCount, index', digiCount, index)
+					
+				break;
+			}
+			
 		break
 
 	}
@@ -393,6 +587,17 @@ const task = state => {
 			gTag = ''
 			maintenanceMode = false
 
+			const dt = new Date();
+			const d =  dt.getDate().toString().padStart(2, '0') +'/'+
+			    (dt.getMonth()+1).toString().padStart(2, '0') + '   '+ //'/'+
+			    // dt.getFullYear().toString().substr(-2) +' '+
+			    dt.getHours().toString().padStart(2, '0') +':'+
+			    dt.getMinutes().toString().padStart(2, '0') +':'+
+			    dt.getSeconds().toString().padStart(2, '0')
+			lcd.printLineSync(0, d);
+			lcd.printLineSync(1, ' Key in or Tap  ');
+
+			clearTimeout(timeoutMenu)
 			clearInterval(intervalMenu)
 			intervalMenu = setInterval(() => {
 				const dt = new Date();
@@ -475,6 +680,8 @@ const task = state => {
 		  let user = null
 			if(gTag) user =  users.find((u) => (u.tag===gTag) && (u.password===password) )
 			else if(userId) user =  users.find((u) => (u.userId===userId) && (u.password===password) )
+			else if(maintenanceMode) user =  users.find((u) => (u.maintenance===true) && (u.password===password) )
+				
     	if(!user) {
 				lcd.printLineSync(0, '   Password     ');
 				lcd.printLineSync(1, '  incorrect!    ');
@@ -485,6 +692,7 @@ const task = state => {
 				}, 2*1000)	
 				return			
 			}
+			if(maintenanceMode) return task('maintenance-menu')
 			task('validation-to')
 		break; 
 
@@ -513,28 +721,6 @@ const task = state => {
 				
 			}, 1*1000)
 			
-			clearTimeout(timeoutMenu)
-			timeoutMenu = setTimeout(()=>{
-				task('timeout')
-			}, 10*1000)	
-		break;
-		
-		case 'maintenance-to': 
-			clearInterval(intervalMenu)
-
-			lcd.printLineSync(0, 'To Maintenance? ');
-			lcd.printLineSync(1, 'EXIT(*)    OK(#)');
-
-			clearTimeout(timeoutMenu)
-			timeoutMenu = setTimeout(()=>{
-				task('timeout')
-			}, 10*1000)	
-		break;
-
-		case 'maintenance-menu': 
-			lcd.printLineSync(0, maintenance[menuCount]);
-			lcd.printLineSync(1, 'NEXT(*)    OK(#)');
-
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{
 				task('timeout')
@@ -661,6 +847,7 @@ const task = state => {
 		break;
 
 		case 'fill-complete':
+		case 'done':
 			clearInterval(intervalMenu)
 			lcd.printLineSync(0, '      Done      ');
 			lcd.printLineSync(1, '                ');
@@ -668,6 +855,105 @@ const task = state => {
 			timeoutMenu = setTimeout(()=>{
 				task('ready')
 			}, 3*1000)	
+		break;
+
+		case 'maintenance-to': 
+			clearInterval(intervalMenu)
+
+			lcd.printLineSync(0, 'To Maintenance? ');
+			lcd.printLineSync(1, 'EXIT(*)    OK(#)');
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, 10*1000)	
+		break;
+
+		case 'maintenance-menu': 
+			menuCount=0
+			lcd.printLineSync(0, maintenanceMenu[menuCount].padEnd(16, ' '));
+			lcd.printLineSync(1, 'NEXT(*)    OK(#)');
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, 10*1000)	
+		break;
+		case 'Reboot': 
+			clearInterval(intervalMenu)
+			lcd.printLineSync(0, '    Reboot?     ');
+			lcd.printLineSync(1, 'NO(*)     YES(#)');
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, 10*1000)	
+		break; 
+		case 'Set-oil-price': 
+			priceText = price+''
+			clearInterval(intervalMenu)
+			
+			lcd.printLineSync(0, 'Price/Litres> '+priceText.padStart(2, ' '));
+			if(!priceText.length) lcd.printLineSync(1, 'EXIT(*)    OK(#)');
+			else lcd.printLineSync(1, 'CLEAR(*)   OK(#)');
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, 10*1000)	
+		break;
+
+		case 'Set-date-time': 	
+			setDate = true
+			digiCount = 0
+			index = 0
+			dateText =''
+			timeText=''
+
+			const dtNow = new Date();
+			dateText =  dtNow.getDate().toString().padStart(2, '0') +'/'+
+			    (dtNow.getMonth()+1).toString().padStart(2, '0') + '/'+
+			    dtNow.getFullYear().toString()//.substr(-2) 
+			timeText = dtNow.getHours().toString().padStart(2, '0') +':'+
+			    dtNow.getMinutes().toString().padStart(2, '0') +':'+
+			    dtNow.getSeconds().toString().padStart(2, '0')
+
+			lcd.printLineSync(0, 'DATE> '+dateText);
+			lcd.printLineSync(1, 'TIME(*)  SAVE(#)');
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, 30*1000)	
+
+			clearInterval(intervalMenu)
+			intervalMenu = setInterval (()=>{
+				let lcdShow = ''
+				if(setDate) {					
+					if(blink) {
+						lcdShow = dateText.substring(0, index) + '_' + dateText.substring(index + 1)
+						blink = false
+					}
+					else {
+						lcdShow = dateText
+						blink = true
+					}
+					lcd.printLineSync(0, 'DATE> '+lcdShow);
+					lcd.printLineSync(1, 'TIME(*)  SAVE(#)');
+				}
+				else {
+					if(blink) {
+						lcdShow = timeText.substring(0, index) + '_' + timeText.substring(index + 1)
+						blink = false
+					}
+					else {
+						lcdShow = timeText
+						blink = true
+					}
+					lcd.printLineSync(0, 'TIME>   '+lcdShow);
+					lcd.printLineSync(1, 'DATE(*)  SAVE(#)');
+				}
+			}, 500)
+
 		break;
 
 	}
