@@ -14,6 +14,7 @@
     "input-event": "^1.2.6",
     "morgan": "^1.10.0",
     "onoff": "^6.0.3",
-    "raspberrypi-liquid-crystal": "^1.15.0"
+    "raspberrypi-liquid-crystal": "^1.15.0",
+    "serialport": "^9.2.4"
   }
 }

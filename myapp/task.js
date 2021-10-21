@@ -3,8 +3,18 @@ let gState = 'init'
 let gTag = ''
 let userId = ''
 let password = ''
+
 let intervalMenu
 let timeoutMenu
+let pingTimeout
+
+const menuTimeoutCount=30
+const fillTimeoutCount=15
+const alertTimeoutCount=3
+const skipTimeoutCount=10
+const pingTimeoutCount=5
+const showTimeCount=5
+
 let bathText=''
 let litresText=''
 let maintenanceMode=false
@@ -19,11 +29,32 @@ let digiCount=0
 let setDate=true
 let index=0
 
-// test user rfid
-const users = [ 
-  {tag: '0443770628', name: 'Jone', userId: '1122334455', password:'1234'},
-  {tag: '', name: 'Admin', userId: '1234', password:'4321', maintenance:true},
-]
+let port
+let portOk=false
+
+let serialReceiveCmd=''
+
+// 2.1 Request Message 
+// 				Start byte 	ID 		Command tag Command data 		Stop byte
+// length 1 					1 		2 					v 							1
+// 				: 					D/G 	01-FF 			Check requires 	;
+
+const cmd = {	
+	start: 	':',
+	end: 		';',
+	Set_date_time: 	'01', // YYMMDDHHMMSS
+	Set_fuel_price: '02', // ffff.ff
+	Play_sound: 		'03', // XX
+	Set_flow_sensor:'04', // XXXXX
+	Set_fuel_type:  '05', // Y (D/G)
+	reset_fuel_tank_to_full: '06200', //200=liters
+	Set_minimum_price: 		'08', // YY 
+	clear_stored_amount: 	'0A', // XXXX (password)
+	sale_by_member_debit_money: 	'0B', // XXXXmmmm
+	set_value_of_K_of_dispenser: 	'0C', // YY (0_50)
+	set_value_of_K_of_Liter_range:'0D', // LLLKKKK
+	check_status_PING: '0E', //Null
+}
 
 const maintenanceMenu = [
 	'Set oil price',
@@ -38,6 +69,21 @@ const maintenanceMenu = [
 	'Exit',
 ]
 let menuCount=0
+
+
+// test data ===================================
+// test user rfid
+const users = [ 
+  {tag: '0443770628', name: 'Jone', userId: '1122334455', password:'1234'},
+  {tag: '', name: 'Admin', userId: '1234', password:'4321', maintenance:true},
+]
+
+
+// read from database
+let pricePerLiter = 33.50
+let orderID = 0 
+let cmdFuelType="D"
+
 
 
 //======================== lcd
@@ -164,10 +210,23 @@ const checkKey = (col) => {
 		case 'ready':
 			switch(key) {
 				case '*': return task('maintenance-to'); break;
+				case '#': return task('ready-show-date'); break;
 				case '1': case '2': case '3': case '4': case '5': 
 				case '6': case '7': case '8': case '9': case '0': 
 					userId += key; return task('user-id');
 				break;
+			}
+		break 
+		case 'ready-not-ping':
+			switch(key) {
+				case '*': return task('init-rfid'); break;
+				case '#': return task('init-rfid'); break;
+			}
+		break
+		case 'init-rfid':
+			switch(key) {
+				case '*': return task('init-rfid'); break;
+				case '#': return task('init-serial'); break;
 			}
 		break
 
@@ -192,6 +251,7 @@ const checkKey = (col) => {
 				break;
 				case '#': 
 				{
+					if(!userId.length) return
 					const user =  users.find((u) => (u.userId === userId) )
 					if(user) return task('password');
 					return task('user-not-found'); 
@@ -210,7 +270,7 @@ const checkKey = (col) => {
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{
 				task('timeout')
-			}, 10*1000)
+			}, menuTimeoutCount*1000)
 		break
 
 		case 'password':
@@ -219,7 +279,10 @@ const checkKey = (col) => {
 					if(password.length) password = password.slice(0, -1); 
 					else return task('ready'); 
 				break;
-				case '#': return task('auth'); break;
+				case '#': 
+					if(!password.length) return
+					return task('auth'); 
+				break;
 				case '1': case '2': case '3': case '4': case '5': 
 				case '6': case '7': case '8': case '9': case '0': 
 					password += key
@@ -233,13 +296,13 @@ const checkKey = (col) => {
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{
 				task('timeout')
-			}, 30*1000)	
+			}, menuTimeoutCount*1000)	
 		break 
 
 		case 'validation-to':
 			switch(key) {
-				case '*': return task('fill-select'); break;
-				case '#': return task('validation-process'); break;
+				case '*': return task('validation-process'); break; 
+				case '#': return task('fill-select'); break;
 			}
 		break
 
@@ -253,7 +316,7 @@ const checkKey = (col) => {
 
 		case 'fill-full-confirm':
 			switch(key) {
-				case '*': return task('ready'); break;
+				case '*': return task('fill-select'); break;
 				case '#': return task('fill-full'); break;
 			}
 		break
@@ -262,7 +325,7 @@ const checkKey = (col) => {
 			switch(key) {
 				case '*': 
 					if(bathText.length) bathText = bathText.slice(0, -1); 
-					else return task('ready'); 
+					else return task('fill-select'); 
 				break;
 				case '#': 
 					if(bathText.length)
@@ -275,18 +338,18 @@ const checkKey = (col) => {
 			}
 
 			lcd.printLineSync(0, 'Amount> '+bathText.padStart(8, ' '));
-			if(!bathText.length) lcd.printLineSync(1, 'EXIT(*)    OK(#)');
+			if(!bathText.length) lcd.printLineSync(1, 'BACK(*)    OK(#)');
 			else lcd.printLineSync(1, 'CLEAR(*)   OK(#)');
 
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{				
 				task('timeout')
-			}, 10*1000)	
+			}, menuTimeoutCount*1000)	
 		break
 
 		case 'fill-bath-confirm':
 			switch(key) {
-				case '*': return task('ready'); break;
+				case '*': return task('fill-select'); break;
 				case '#': return task('fill-bath'); break;
 			}
 		break
@@ -295,7 +358,7 @@ const checkKey = (col) => {
 			switch(key) {
 				case '*': 
 					if(litresText.length) litresText = litresText.slice(0, -1); 
-					else return task('ready'); 
+					else return task('fill-select'); 
 				break;
 				case '#': 
 					if(litresText.length)
@@ -308,19 +371,36 @@ const checkKey = (col) => {
 			}
 
 			lcd.printLineSync(0, 'Litres> '+litresText.padStart(8, ' '));
-			if(!litresText.length) lcd.printLineSync(1, 'EXIT(*)    OK(#)');
+			if(!litresText.length) lcd.printLineSync(1, 'BACK(*)    OK(#)');
 			else lcd.printLineSync(1, 'CLEAR(*)   OK(#)');
 
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{				
 				task('timeout')
-			}, 10*1000)	
+			}, menuTimeoutCount*1000)	
 		break
 
 		case 'fill-litres-confirm':
 			switch(key) {
-				case '*': return task('ready'); break;
+				case '*': return task('fill-select'); break;
 				case '#': return task('fill-litres'); break;
+			}
+		break
+
+		case 'fill-timeout':
+			switch(key) {
+				case '*': return task('ready'); break;
+				case '#': return task('ready'); break;
+			}
+		break
+
+		case 'fill-complete':
+			switch(key) {
+				// case '*': return task('ready'); break;
+				case '#': 
+				  // log to database confirm
+					return task('ready');
+				break;
 			}
 		break
 
@@ -357,7 +437,7 @@ const checkKey = (col) => {
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{
 				task('timeout')
-			}, 10*1000)	
+			}, menuTimeoutCount*1000)	
 		break;
 
 		case 'Set-oil-price':
@@ -369,6 +449,7 @@ const checkKey = (col) => {
 				case '#': 
 					if(priceText.length) {
 						price = priceText*1
+						console.log('price', price)
 						return task('done'); 
 					}
 				break;
@@ -385,7 +466,7 @@ const checkKey = (col) => {
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{				
 				task('timeout')
-			}, 30*1000)	
+			}, menuTimeoutCount*1000)	
 		break
 
 		case 'Reboot': 
@@ -409,7 +490,7 @@ const checkKey = (col) => {
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{				
 				task('timeout')
-			}, 30*1000)	
+			}, menuTimeoutCount*1000)	
 
 			switch(key) {
 				case '*': 
@@ -547,7 +628,176 @@ const scanKeyInterval = () => {
 }
 
 
-//======================== main task
+// check serial port ====================================================
+
+const serialInit = () => {
+	const fs = require("fs");
+	const path = '/dev/ttyUSB0'
+
+	if (!fs.existsSync(path)) {
+		console.log(path, 'not found')
+		return 1
+	} 	
+
+	if(portOk) return 0
+
+	const SerialPort = require('serialport')
+	port = new SerialPort('/dev/ttyUSB0', {
+	  autoOpen: true,
+	  baudRate: 9600,
+	  dataBits: 8,
+	  parity: 'none',
+	  stopBits: 1,
+	  // hupcl: true,
+	  // lock: true,	  
+	  // rtscts: false,	  
+	  // xany: false,
+	  // xoff: false,
+	  // xon: false,
+	})
+
+	// port.open(function (err) {
+	//   if (err) {
+	//     return console.log('Error opening port: ', err.message)
+	//   }
+
+	//   // Because there's no callback to write, write errors will be emitted on the port:
+	//   port.write('main screen turn on ==')
+	// })
+
+	const byteParser = new SerialPort.parsers.ByteLength({ length: 1 })
+	port.pipe(byteParser)
+
+	// Open errors will be emitted as an error event
+	port.on('error', function(err) {
+	  console.log('Error: ', err.message)
+	})
+
+	// The open event is always emitted
+	port.on('open', function() {
+	  console.log('Port open')
+	  portOk = true
+
+	 //  port.write('main screen turn on', function(err) {
+		//   if (err) {
+		//     return console.log('Error on write: ', err.message)
+		//   }
+		//   console.log('message written')
+		// })
+		// setInterval(()=> port.write(':D0E;') ,5000)
+
+	})
+
+	// Read data that is available but keep the stream in "paused mode"
+	// port.on('readable', function () {
+	//   console.log('Readable:', port.read())
+	// })
+
+	// Switches the port into "flowing mode"
+	// port.on('data', function (data) {
+	//   console.log('Data:', data)
+	// })
+
+	port.on('close', () => {
+	  console.log('Serial port disconnected.')
+	  portOk = false
+	})
+
+	/**
+	 * listen to the bytes as they are parsed from the parser.
+	 */
+	byteParser.on('data', data => {
+	  // console.log('byteParser data:', data, data.toString())
+	  serialReceive(data)
+	})
+
+
+	return 0
+
+}
+
+const serialTransmit = (command) => {
+	console.log('serialTransmit: cmd, state =>', command, gState)
+	if(!portOk) {				
+		console.log('serialTransmit: !portOk', gState)
+		// log to database
+		return serialInit()
+	}
+
+	serialReceiveCmd=''
+	let cmdNow
+	let orderIDtext
+
+	switch(command) {
+		case 'check_status_PING':
+			cmdNow = cmd.start + cmdFuelType + cmd.check_status_PING + cmd.end	
+		break
+		case 'sale_by_member_debit_money':
+			orderIDtext = (++orderID).toString().padStart(4, '0')
+			switch(gState) {
+				case 'fill-full':
+					cmdNow = cmd.start + cmdFuelType + cmd.sale_by_member_debit_money + 
+						'9999' + orderIDtext + cmd.end			
+				break
+				case 'fill-bath':
+					cmdNow = cmd.start + cmdFuelType + cmd.sale_by_member_debit_money + 
+						bathText.padStart(4, '0') + orderIDtext + cmd.end			
+				break
+				case 'fill-litres':
+					bathText = ( Math.floor(litresText*pricePerLiter) +'').padStart(4, '0')
+					// console.log('bathText =>', bathText)
+					cmdNow = cmd.start + cmdFuelType + cmd.sale_by_member_debit_money + 
+						bathText.padStart(4, '0') + orderIDtext + cmd.end			
+				break
+			}
+		break
+
+		default:
+			console.log('serialTransmit: gState not found =>', gState)
+			// log to database
+			return
+		break
+
+	}
+	console.log('cmdNow =>', cmdNow)
+	port.write(cmdNow)
+
+}
+
+const serialReceive = (buf) => {
+	const bufChar = buf.toString()
+
+	if(bufChar===cmd.start) return serialReceiveCmd = ':'
+	serialReceiveCmd += bufChar
+	if(bufChar===cmd.end) {
+		console.log('serialReceiveCmd =>', serialReceiveCmd)
+		switch(gState) {
+			case 'ready':
+				clearTimeout(pingTimeout)		
+			break
+			case 'fill-full':
+				console.log('fill-full complete')
+				// log to database
+				task('fill-complete')
+			break
+			case 'fill-bath':
+				console.log('fill-full complete')
+				// log to database
+				task('fill-complete')
+			break
+			case 'fill-litres':
+				console.log('fill-full complete')
+				// log to database
+				task('fill-complete')
+			break
+		}
+		serialReceiveCmd=''
+	}
+
+}
+
+
+//======================== main task ===========================================================================
 
 const task = state => {
 	console.log(new Date().getTime(), 'task:', state)
@@ -559,26 +809,47 @@ const task = state => {
 			// Clear any previously displayed content
 			lcd.clearSync();
 			// Display text multiline
-			lcd.printLineSync(0, 'Init...         ');
-			lcd.printLineSync(1, '                ');
+			
+			scanKeyInterval()		
+			task('init-rfid')
+		break;
 
+		case 'init-rfid':
+		{
 			const err = rfidInit()
-			scanKeyInterval()
-
 			if(err) {
-				lcd.printLineSync(0, 'Init ERROR      ');
-				lcd.printLineSync(1, 'RFID Not Found  ');
+				lcd.printLineSync(0, 'RFID Not Found  ');
+				lcd.printLineSync(1, 'CHECK(*) SKIP(#)');
 				clearTimeout(timeoutMenu)
 				timeoutMenu = setTimeout(()=>{
-					task('ready')
-				}, 5*1000)
+					task('init-serial')
+				}, skipTimeoutCount*1000)
+				return
+			}
+			task('init-serial')
+		}
+		break;
+
+		case 'init-serial':  
+		{
+			const err = serialInit()
+			if(err) {
+				lcd.printLineSync(0, 'Serial Not Found');
+				lcd.printLineSync(1, '    CHECK(*)    ');
+				clearTimeout(timeoutMenu)
+				// timeoutMenu = setTimeout(()=>{
+				// 	task('ready')
+				// }, 2*1000)
 				return
 			}
 			
-			lcd.printLineSync(0, 'init OK         '); 
+			lcd.printLineSync(0, '     Ready      ');
+			lcd.printLineSync(1, '      ...       ');  
+			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{
 				task('ready')
 			}, 2*1000)
+		}
 		break;
 
 		case 'ready':			
@@ -586,6 +857,13 @@ const task = state => {
 			userId = ''
 			gTag = ''
 			maintenanceMode = false
+
+			serialTransmit('check_status_PING')
+			clearTimeout(timeoutMenu)
+			clearTimeout(pingTimeout)
+			pingTimeout = setTimeout(()=>{
+				task('ready-not-ping')
+			}, pingTimeoutCount*1000)	
 
 			const dt = new Date();
 			const d =  dt.getDate().toString().padStart(2, '0') +'/'+
@@ -597,7 +875,6 @@ const task = state => {
 			lcd.printLineSync(0, d);
 			lcd.printLineSync(1, ' Key in or Tap  ');
 
-			clearTimeout(timeoutMenu)
 			clearInterval(intervalMenu)
 			intervalMenu = setInterval(() => {
 				const dt = new Date();
@@ -611,7 +888,50 @@ const task = state => {
 
 				lcd.printLineSync(0, d);
 				lcd.printLineSync(1, ' Key in or Tap  ');
-			}, 1000)
+			}, 1*1000)
+		break
+
+		case 'ready-not-ping':
+		  clearInterval(intervalMenu)
+			lcd.printLineSync(0, ' Ping not found '); 
+			lcd.printLineSync(1, '    CHECK(*)    ');
+		break;
+
+		case 'ready-show-date':	
+		{		
+			const dt = new Date();
+			const d =  dt.getDate().toString().padStart(2, '0') +'/'+
+			    (dt.getMonth()+1).toString().padStart(2, '0') + '/'+ //'/'+
+			    dt.getFullYear().toString()//.substr(-2) 
+
+			const t = dt.getHours().toString().padStart(2, '0') +':'+
+			    dt.getMinutes().toString().padStart(2, '0') +':'+
+			    dt.getSeconds().toString().padStart(2, '0')
+
+			lcd.printLineSync(0, '   '+d.padEnd(16,' '));
+			lcd.printLineSync(1, '    '+t.padEnd(16,' '));
+
+			clearInterval(intervalMenu)
+			intervalMenu = setInterval(() => {
+				const dt = new Date();
+				const d =  dt.getDate().toString().padStart(2, '0') +'/'+
+				    (dt.getMonth()+1).toString().padStart(2, '0') + '/'+ //'/'+
+				    dt.getFullYear().toString()//.substr(-2) 
+
+				const t = dt.getHours().toString().padStart(2, '0') +':'+
+				    dt.getMinutes().toString().padStart(2, '0') +':'+
+				    dt.getSeconds().toString().padStart(2, '0')
+
+				lcd.printLineSync(0, '   '+d.padEnd(16,' '));
+				lcd.printLineSync(1, '    '+t.padEnd(16,' '));
+			}, 1*1000)
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('ready')
+			}, showTimeCount*1000)	
+
+		}
 		break
 
 		case 'card-id':
@@ -624,7 +944,7 @@ const task = state => {
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{
 				task('timeout')
-			}, 10*1000)	
+			}, menuTimeoutCount*1000)	
 		break;
 
 		case 'user-id':
@@ -637,7 +957,7 @@ const task = state => {
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{
 				task('timeout')
-			}, 10*1000)	
+			}, menuTimeoutCount*1000)	
 		break;
 
 		case 'user-not-found':
@@ -660,7 +980,7 @@ const task = state => {
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{
 				task('timeout')
-			}, 30*1000)	
+			}, menuTimeoutCount*1000)	
 		break;
 
 		case 'timeout':
@@ -697,17 +1017,17 @@ const task = state => {
 		break; 
 
 		case 'validation-to':
-			lcd.printLineSync(0, '  validation ?  ');
-			lcd.printLineSync(1, 'SKIP(*)    OK(#)');
+			lcd.printLineSync(0, '   Validation?  ');
+			lcd.printLineSync(1, 'OK(*)    SKIP(#)');
 			
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{
 				task('timeout')
-			}, 10*1000)	
+			}, menuTimeoutCount*1000)	
 		break;
 
 		case 'validation-process':
-			lcd.printLineSync(0, '   validation   ');
+			lcd.printLineSync(0, '   Validation   ');
 			lcd.printLineSync(1, '>>  Process   <<');
 			intervalMenu = setInterval(() => {
 				if(blink) {
@@ -724,7 +1044,7 @@ const task = state => {
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{
 				task('timeout')
-			}, 10*1000)	
+			}, menuTimeoutCount*1000)	
 		break;
 
 		case 'fill-select': 
@@ -733,7 +1053,7 @@ const task = state => {
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{
 				task('timeout')
-			}, 10*1000)	
+			}, menuTimeoutCount*1000)	
 		break;
 
 		case 'fill-full-confirm': 
@@ -742,11 +1062,13 @@ const task = state => {
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{
 				task('timeout')
-			}, 10*1000)	
+			}, menuTimeoutCount*1000)	
 		break;
 		case 'fill-full':
 			lcd.printLineSync(0, '  Fill to full  ');
 			lcd.printLineSync(1, '>>  Process   <<');
+
+			serialTransmit('sale_by_member_debit_money')
 
 			intervalMenu = setInterval(() => {
 				if(blink) {
@@ -763,17 +1085,17 @@ const task = state => {
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{
 				task('fill-complete')
-			}, 10*1000)	
+			}, fillTimeoutCount*1000)	
 		break;
 
 		case 'fill-bath-select':
 			bathText = ''
 			lcd.printLineSync(0, 'Amount> '+bathText.padStart(8, ' '));
-			lcd.printLineSync(1, 'EXIT(*)    OK(#)');
+			lcd.printLineSync(1, 'BACK(*)    OK(#)');
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{				
 				task('timeout')
-			}, 10*1000)	
+			}, menuTimeoutCount*1000)	
 		break;
 		case 'fill-bath-confirm': 
 			clearInterval(intervalMenu)
@@ -782,11 +1104,13 @@ const task = state => {
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{
 				task('timeout')
-			}, 10*1000)	
+			}, menuTimeoutCount*1000)	
 		break;
 		case 'fill-bath':
 			lcd.printLineSync(0, ' Fill '+bathText.padStart(4, ' ')+' Bath ');
-			lcd.printLineSync(1, '>>  Process   <<');
+			lcd.printLineSync(1, '>>  Process   <<');			
+		
+			serialTransmit('sale_by_member_debit_money')
 
 			intervalMenu = setInterval(() => {
 				if(blink) {
@@ -798,22 +1122,23 @@ const task = state => {
 					lcd.printLineSync(1, ' >> Process  << ');
 				}
 				
-			}, 1000)
+			}, 1*1000)
 
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{
-				task('fill-complete')
-			}, 10*1000)	
+				task('fill-timeout')
+			}, fillTimeoutCount*1000)	
 		break;
 
 		case 'fill-litres-select':
 			bathText = ''
-			lcd.printLineSync(0, 'Litres> '+bathText.padStart(8, ' '));
-			lcd.printLineSync(1, 'EXIT(*)    OK(#)');
+			litresText = ''
+			lcd.printLineSync(0, 'Litres> '+litresText.padStart(8, ' '));
+			lcd.printLineSync(1, 'BACK(*)    OK(#)');
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{				
 				task('timeout')
-			}, 10*1000)	
+			}, menuTimeoutCount*1000)	
 		break;
 		case 'fill-litres-confirm': 
 			clearInterval(intervalMenu)
@@ -822,11 +1147,13 @@ const task = state => {
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{
 				task('timeout')
-			}, 10*1000)	
+			}, menuTimeoutCount*1000)	
 		break;
 		case 'fill-litres':
 			lcd.printLineSync(0, 'Fill '+litresText.padStart(3, ' ')+' Litres ');
 			lcd.printLineSync(1, '>>  Process   <<');
+
+			serialTransmit('sale_by_member_debit_money')
 
 			intervalMenu = setInterval(() => {
 				if(blink) {
@@ -838,15 +1165,35 @@ const task = state => {
 					lcd.printLineSync(1, ' >> Process  << ');
 				}
 				
-			}, 1000)
+			}, 1*1000)
 
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{
-				task('fill-complete')
-			}, 10*1000)	
+				task('fill-timeout')
+			}, fillTimeoutCount*1000)	
+		break;
+
+		case 'fill-timeout':
+			clearInterval(intervalMenu)
+			lcd.printLineSync(0, '  Fill Timeout  ');
+			lcd.printLineSync(1, 'RESET(*) SKIP(#)');
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('ready')
+			}, menuTimeoutCount*1000)	
+			// log to database
 		break;
 
 		case 'fill-complete':
+			clearInterval(intervalMenu)
+			lcd.printLineSync(0, ' Fill complete  ');
+			lcd.printLineSync(1, '                ');
+			// lcd.printLineSync(1, '           OK(#)');
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('ready')
+			}, alertTimeoutCount*1000)	
+		break;
 		case 'done':
 			clearInterval(intervalMenu)
 			lcd.printLineSync(0, '      Done      ');
@@ -854,7 +1201,7 @@ const task = state => {
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{
 				task('ready')
-			}, 3*1000)	
+			}, alertTimeoutCount*1000)	
 		break;
 
 		case 'maintenance-to': 
@@ -866,7 +1213,7 @@ const task = state => {
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{
 				task('timeout')
-			}, 10*1000)	
+			}, menuTimeoutCount*1000)	
 		break;
 
 		case 'maintenance-menu': 
@@ -877,16 +1224,16 @@ const task = state => {
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{
 				task('timeout')
-			}, 10*1000)	
+			}, menuTimeoutCount*1000)	
 		break;
 		case 'Reboot': 
 			clearInterval(intervalMenu)
-			lcd.printLineSync(0, '    Reboot?     ');
+			lcd.printLineSync(0, ' Reboot Machine?');
 			lcd.printLineSync(1, 'NO(*)     YES(#)');
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{
 				task('timeout')
-			}, 10*1000)	
+			}, menuTimeoutCount*1000)	
 		break; 
 		case 'Set-oil-price': 
 			priceText = price+''
@@ -899,7 +1246,7 @@ const task = state => {
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{
 				task('timeout')
-			}, 10*1000)	
+			}, menuTimeoutCount*1000)	
 		break;
 
 		case 'Set-date-time': 	
@@ -923,7 +1270,7 @@ const task = state => {
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{
 				task('timeout')
-			}, 30*1000)	
+			}, menuTimeoutCount*1000)	
 
 			clearInterval(intervalMenu)
 			intervalMenu = setInterval (()=>{
