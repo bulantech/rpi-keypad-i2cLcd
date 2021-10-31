@@ -1,0 +1,538 @@
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <%- include partials/headTag.ejs %>
+  </head>
+
+  <body>
+    <%- include partials/navbar.ejs %>
+
+    <div class="container-fluid">
+      <div class="row">
+        <nav class="col-md-2 d-none d-md-block bg-light sidebar">
+          <%- include partials/sidebar.ejs %>
+        </nav>
+
+        <main role="main" class="col-md-9 ml-sm-auto col-lg-10 pt-3 px-4">
+          <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
+            <h1 class="h2">Users</h1>
+            <button type="button" class="btn btn-success mb-2 add-user"  id="btnAddUser" data-toggle="modal" data-target="#modalAddUser">
+              <i class="fa fa-plus new-user"></i>
+              <i class="fa fa-spinner fa-pulse fa-fw new-user" style="display: none;"></i>
+              Add User                
+            </button>
+
+          </div>
+
+          <div class="card">
+            <div class="card-content">
+              <div class="card-body">
+
+                <table id="example" class="table table-striped table-bordered" style="width:100%">
+                  <thead class="text-center">
+                      <tr>
+                          <th>User ID</th>                          
+                          <th>Tag</th>
+                          <th>Username</th>
+                          <th>Name</th>
+                          <th>Address</th>
+                          <th>Role</th>                          
+                          <th>Last login</th>                          
+                          <th>Action</th>
+                      </tr>
+                  </thead>
+                  <tbody class="d-none">
+
+                    <% for(var i=0; i < users.length; i++) { %>
+                       <tr>
+                         <td><%= users[i].userID %></td>
+                         <td><%= users[i].tag %></td>
+                         <td><%= users[i].username %></td>
+                         <td><%= users[i].name %></td>
+                         <td><%= users[i].address %></td>
+                         <td><%= users[i].role %></td>
+                         <td><%= users[i].lastLogin %></td>
+                         <td>
+                            <div class="text-center">
+                              <button type="button" class="btn btn-outline-primary btn-sm mx-1" data-toggle="modal" data-target="#modalEditUser" data-userid="<%= users[i].userID %>">
+                                <i class="fa fa-edit"></i>
+                                Edit
+                              </button>
+                              <% if(users[i].username==='owner') { %>
+                                <button type="button" class="btn btn-outline-danger btn-sm mx-1" disabled>
+                                  <i class="fa fa-trash"></i>
+                                  Delete
+                                </button>
+                              <% } else { %>
+                                <button type="button" class="btn btn-outline-danger btn-sm mx-1" data-toggle="modal" data-target="#modalDelUser" data-userid="<%= users[i].userID %>">
+                                <i class="fa fa-trash"></i>
+                                Delete
+                              </button>
+                              <% } %>
+                            </div>
+                          </td>
+                       </tr>
+                    <% } %>
+                      
+                      
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+        </main>
+      </div>
+    </div>
+
+    <!-- Modal -->
+
+    <div class="modal fade" id="modalAddUser" tabindex="-1" role="dialog" aria-labelledby="modalAddUser" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title text-success" >
+              <i class="fa fa-plus"></i>
+              Add user
+            </h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+
+          <form action="" id="add-user-form">>
+          <div class="modal-body version my-1">
+
+            <!-- <form> -->
+              <div class="mb-3">
+                <label for="userID" class="form-label">User ID</label>
+                <input type="number" class="form-control" name="userID" required>
+              </div>
+              <div class="mb-3">
+                <label for="tag" class="form-label">Tag</label>
+                <input type="number" class="form-control" name="tag">
+              </div>
+              <div class="mb-3">
+                <label for="username" class="form-label">Username</label>
+                <input type="text" class="form-control" name="username" required>
+              </div>
+              <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" class="form-control" name="password" required >
+              </div>
+              <div class="mb-3">
+                <label for="name" class="form-label">Name</label>
+                <input type="text" class="form-control" name="name" required>
+              </div>
+              <div class="mb-3">
+                <label for="address" class="form-label">Address</label>
+                <!-- <input type="text" class="form-control" id="address"> -->
+                <textarea class="form-control" name="address" rows="2"></textarea>
+              </div>
+              <div class="mb-3">
+                <label for="role" class="form-label">Role</label>
+                <select class="form-control" aria-label="Role" name="role">
+                  <option value="member" selected>Member</option>
+                  <option value="employee">Employee</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+
+              <!-- <button type="submit" class="btn btn-primary">Submit</button> -->
+            <!-- </form> -->
+
+          </div>
+
+          <div class="modal-footer">
+            <h6 id="alertAdd" class="text-danger mr-auto">alertAdd</h6>
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            <button type="submit" class="btn btn-success add-user">
+              <i class="fa fa-spinner fa-pulse fa-fw add-user d-none" ></i>
+              Save
+            </button>
+          </div>
+
+          </form>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="modalDelUser" tabindex="-1" role="dialog" aria-labelledby="modalDelUser" aria-hidden="true">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title text-danger" >
+              <i class="fa fa-trash"></i>
+              Delete user
+            </h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body text-center">
+            <h5>Delete user ID "<span class="userid"></span>" ? </h5>
+          </div>
+          <div class="modal-footer">
+            <h6 id="alertDel" class="text-danger mr-auto">alertDel</h6>
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-danger del-user" id="btnDelConfirm">
+              <i class="fa fa-spinner fa-pulse fa-fw del-user d-none" ></i>
+              Delete
+          </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="modalEditUser" tabindex="-1" role="dialog" aria-labelledby="modalEditUser" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title text-primary" >
+              <i class="fa fa-edit"></i>
+              Edit user
+            </h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+
+          <form action="" id="edit-user-form">
+          <div class="modal-body version my-1">
+
+            <!-- <form> -->
+              <div class="mb-3">
+                <label for="userID" class="form-label">User ID</label>
+                <input type="number" class="form-control" name="userID" disabled >
+              </div>
+              <div class="mb-3">
+                <label for="tag" class="form-label">Tag</label>
+                <input type="number" class="form-control" name="tag">
+              </div>
+              <div class="mb-3">
+                <label for="username" class="form-label">Username</label>
+                <input type="text" class="form-control" name="username" required>
+              </div>
+              <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" class="form-control" name="password" required disabled value="**********">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="checkEditPassword">
+                    <label class="form-check-label" for="checkEditPassword">
+                      Edit Password
+                    </label>
+                </div>
+              </div>
+              <div class="mb-3">
+                <label for="name" class="form-label">Name</label>
+                <input type="text" class="form-control" name="name" required>
+              </div>
+              <div class="mb-3">
+                <label for="address" class="form-label">Address</label>
+                <!-- <input type="text" class="form-control" id="address"> -->
+                <textarea class="form-control" name="address" rows="2"></textarea>
+              </div>
+              <div class="mb-3">
+                <label for="role" class="form-label">Role</label>
+                <select class="form-control" aria-label="Role" name="role">
+                  <option value="member">Member</option>
+                  <option value="employee">Employee</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+
+              <!-- <button type="submit" class="btn btn-primary">Submit</button> -->
+            <!-- </form> -->
+
+          </div>
+
+          <div class="modal-footer">
+            <h6 id="alertEdit" class="text-danger mr-auto">alertEdit</h6>
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            <button type="submit" class="btn btn-primary edit-user" disabled>
+              <i class="fa fa-spinner fa-pulse fa-fw edit-user d-none" ></i>
+              Save Edit
+            </button>
+          </div>
+
+          </form>
+
+        </div>
+      </div>
+    </div>
+
+    <%- include partials/scripts.ejs %>
+
+    <script>
+      var users = []
+
+      $(document).ready(function() {
+        // $('#example').DataTable();
+        var table = $('#example').removeAttr('width').DataTable( {
+          // scrollY:        "300px",
+          scrollX:        true,
+          scrollCollapse: true,
+          paging:         true,
+          columnDefs: [
+              { width: 150, targets: 4 }
+          ],
+          // fixedColumns: true,
+          dom: 'Bfrtip',
+          buttons: [
+          // 'pdf', 'csv', 'excel'
+            {
+              extend: 'pdf',
+              exportOptions: {
+                columns: ':not(:last-child)',
+              },
+              customize: function(doc) {
+                doc.content[1].margin = [ 100, 0, 100, 0 ] //left, top, right, bottom
+              }
+            },
+            {
+              extend: 'csv',
+              exportOptions: {
+                columns: ':not(:last-child)',
+              }
+            },
+            {
+              extend: 'excel',
+              exportOptions: {
+                columns: ':not(:last-child)',
+              }
+            }  
+          ],
+          initComplete: function( settings, json ) {
+            $('tbody').removeClass('d-none')
+          }
+
+        } );
+      
+
+        $('#btnAddUser').click(()=> {
+          $('#add-user-form input').val('') 
+          $('#add-user-form textarea').val('')
+          $('#alertAdd').text('') 
+          $('.modal-footer').find('button.add-user').attr("disabled", false);
+          $('.fa-spinner.add-user').addClass('d-none')
+        })
+
+        $('#add-user-form').submit( function(e) {
+          // do your things
+          $('.modal-footer').find('button.add-user').attr("disabled", true);
+          $('.fa-spinner.add-user').removeClass('d-none')
+
+          var o = {};
+          var a = $( '#add-user-form' ).serializeArray();
+          $.each(a, function () {
+              if (o[this.name]) {
+                  if (!o[this.name].push) {
+                      o[this.name] = [o[this.name]];
+                  }
+                  o[this.name].push(this.value || '');
+              } else {
+                  o[this.name] = this.value || '';
+              }
+          });
+          console.log(o);
+
+          $.ajax({
+            url: '/users/add', // url where to submit the request
+            type : "POST", // type of action POST || GET
+            dataType : 'json', // data type
+            data : o,
+            success : function(result) {
+              // console.log(result);
+              setTimeout(()=>{
+                $('.modal-footer').find('button.add-user').attr("disabled", false);
+                $('.fa-spinner.add-user').addClass('d-none')
+              },1*1000)
+
+              if(result.error) {
+                $('#alertAdd').text(result.msg) 
+              }
+              else {
+                $('#modalAddUser').modal('hide')
+                location.reload();
+              }
+              
+              
+            },
+            error: function(xhr, resp, text) {
+                console.log(xhr, resp, text);
+            }
+          })
+
+          return false;
+        });
+
+        $('#edit-user-form').submit( function(e) {
+          // do your things
+          $('.modal-footer').find('button.edit-user').attr("disabled", true);
+          $('.fa-spinner.edit-user').removeClass('d-none')
+          $('#modalEditUser').find('[name="userID"]').attr("disabled", false);
+
+          var o = {};
+          var a = $( '#edit-user-form' ).serializeArray();
+          $.each(a, function () {
+              if (o[this.name]) {
+                  if (!o[this.name].push) {
+                      o[this.name] = [o[this.name]];
+                  }
+                  o[this.name].push(this.value || '');
+              } else {
+                  o[this.name] = this.value || '';
+              }
+          });
+          console.log(o);
+          $('#modalEditUser').find('[name="userID"]').attr("disabled", true);
+
+          $.ajax({
+            url: '/users/edit', // url where to submit the request
+            type : "POST", // type of action POST || GET
+            dataType : 'json', // data type
+            data : o,
+            success : function(result) {
+              // console.log(result);
+              setTimeout(()=>{
+                $('.modal-footer').find('button.edit-user').attr("disabled", false);
+                $('.fa-spinner.edit-user').addClass('d-none')
+              },1*1000)
+
+              if(result.error) {
+                $('#alertEdit').text(result.msg) 
+              }
+              else {
+                $('#modalEditUser').modal('hide')
+                location.reload();
+              }
+              
+              
+            },
+            error: function(xhr, resp, text) {
+                console.log(xhr, resp, text);
+            }
+          })
+
+          return false;
+        });
+
+        $('#modalDelUser').on('show.bs.modal', function (e) {
+          const userID = $(e.relatedTarget).data('userid');
+          $(e.currentTarget).find('.userid').text(userID);
+
+          $('#modalDelUser .modal-footer').find('button.del-user').attr("disabled", false);
+          $('#modalDelUser .fa-spinner.del-user').addClass('d-none')
+          $('#alertDel').text('') 
+        })
+
+        $('#modalEditUser').on('show.bs.modal', function (e) {
+          const userID = $(e.relatedTarget).data('userid');
+          const user = users.find( u => u.userID === (userID+'') )
+          // console.log('userID, user, users =>', userID, user, users, (typeof(userID) == "number")); //true
+
+          if(!user) {
+            $.ajax({
+              url: '/users/u/'+userID, // url where to submit the request
+              type : "GET", // type of action POST || GET
+              dataType : 'json', // data type
+              data : {},
+              success : function(result) {
+                // console.log('result =>', result);
+                if(result) {
+                  users.push(result)
+
+                  $('#modalEditUser').find('[name="userID"]').val(result.userID)
+                  $('#modalEditUser').find('[name="tag"]').val(result.tag)
+                  $('#modalEditUser').find('[name="username"]').val(result.username)
+                  $('#modalEditUser').find('[name="name"]').val(result.name)
+                  $('#modalEditUser').find('[name="address"]').val(result.address)
+                  $('#modalEditUser').find('[name="role"]').val(result.role).change();
+
+                }
+                else {
+                  alert('User not found !!')
+                }           
+                
+              },
+              error: function(xhr, resp, text) {
+                  console.log(xhr, resp, text);
+              }
+            })
+          }
+          else {
+            $('#modalEditUser').find('[name="userID"]').val(user.userID)
+            $('#modalEditUser').find('[name="tag"]').val(user.tag)
+            $('#modalEditUser').find('[name="username"]').val(user.username)
+            $('#modalEditUser').find('[name="name"]').val(user.name)
+            $('#modalEditUser').find('[name="address"]').val(user.address)
+            $('#modalEditUser').find('[name="role"]').val(user.role).change();
+          }
+
+          $('#modalEditUser .modal-footer').find('button.edit-user').attr("disabled", true);
+          $('#modalEditUser .fa-spinner.edit-user').addClass('d-none')
+          $('#alertEdit').text('') 
+          $('#modalEditUser').find('[name="userID"]').attr("disabled", true);
+        })
+
+        $("#checkEditPassword").change(function() {
+          if(this.checked) {
+            $('#modalEditUser').find('[name="password"]').attr("disabled", false);
+            $('#modalEditUser').find('[name="password"]').val('')
+          }
+          else {
+            $('#modalEditUser').find('[name="password"]').attr("disabled", true);
+          }
+        });
+
+
+        $("#modalEditUser").on("input", function() {
+          $('#modalEditUser').find('button.edit-user').attr("disabled", false);
+        });
+        $('#modalEditUser select').change(e => {
+          $('#modalEditUser').find('button.edit-user').attr("disabled", false);
+        })
+        $('#modalEditUser textarea').change(e => {
+          $('#modalEditUser').find('button.edit-user').attr("disabled", false);
+        })
+        
+
+        $('#btnDelConfirm').click( function (e) {
+          const userID = $('#modalDelUser').find('.userid').text();
+          $('#modalDelUser .modal-footer').find('button.del-user').attr("disabled", true);
+          $('#modalDelUser .fa-spinner.del-user').removeClass('d-none')
+          $.ajax({
+            url: '/users/delete', // url where to submit the request
+            type : "POST", // type of action POST || GET
+            dataType : 'json', // data type
+            data : {userID: userID},
+            success : function(result) {
+              // console.log(result);
+              setTimeout(()=>{
+                $('#modalDelUser .modal-footer').find('button.del-user').attr("disabled", false);
+                $('#modalDelUser .fa-spinner.del-user').addClass('d-none')
+              },1*1000)
+
+              if(result.error) {
+                $('#alertDel').text(result.msg) 
+              }
+              else {
+                location.reload();
+              }
+              
+              
+            },
+            error: function(xhr, resp, text) {
+                console.log(xhr, resp, text);
+            }
+          })
+        })
+
+
+      } ); //$(document).ready(function() {
+
+    </script>
+  </body>
+</html>

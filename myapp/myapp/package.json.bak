@@ -1,0 +1,19 @@
+{
+  "name": "myapp",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node ./bin/www"
+  },
+  "dependencies": {
+    "cookie-parser": "~1.4.4",
+    "debug": "~2.6.9",
+    "ejs": "~2.6.1",
+    "express": "~4.16.1",
+    "http-errors": "~1.6.3",
+    "input-event": "^1.2.6",
+    "morgan": "~1.9.1",
+    "onoff": "^6.0.3",
+    "raspberrypi-liquid-crystal": "^1.15.0"
+  }
+}

@@ -1,0 +1,167 @@
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <%- include partials/headTag.ejs %>
+  </head>
+
+  <body>    
+    <%- include partials/navbar.ejs %>
+
+    <div class="container-fluid">
+
+      <div class="row">
+        <nav class="col-md-2 d-none d-md-block bg-light sidebar">
+          <%- include partials/sidebar.ejs %>
+        </nav>
+
+        <main role="main" class="col-md-9 ml-sm-auto col-lg-10 pt-3 px-4">
+          <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
+            <h1 class="h2">Dashboard</h1>
+
+          </div>
+
+          <div class="row">
+
+            <div class="col-xl-3 col-sm-6 col-12 my-2"> 
+              <div class="card" onClick="window.location='/orders';">
+                <div class="card-content">
+                  <div class="card-body">
+                    <div class="media d-flex">
+                      <div class="align-self-center display-4 ml-4 text-primary">
+                        <i class="fa fa-check"></i>
+                      </div>
+                      <div class="media-body text-right">
+                        <h3 id="ordersCount">---</h3>
+                        <span>To day Orders </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-xl-3 col-sm-6 col-12 my-2"> 
+              <div class="card" onClick="window.location='/orders';">
+                <div class="card-content">
+                  <div class="card-body">
+                    <div class="media d-flex">
+                      <div class="align-self-center display-4 ml-4 text-success">
+                        <i class="fa fa-dollar"></i>
+                      </div>
+                      <div class="media-body text-right">
+                        <h3 id="ordersCount">---</h3>
+                        <span>To day Income </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-xl-3 col-sm-6 col-12 my-2"> 
+              <div class="card">
+                <div class="card-content">
+                  <div class="card-body">
+                    <div class="media d-flex">
+                      <div class="align-self-center display-4 ml-4 text-secondary">
+                        <i class="fa fa-user-circle"></i>
+                      </div>
+                      <div class="media-body text-right">
+                        <h3 id="ordersCount">---</h3>
+                        <span>Attending staff</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-xl-3 col-sm-6 col-12 my-2"> 
+              <div class="card" onClick="window.location='/alerts';">
+                <div class="card-content">
+                  <div class="card-body">
+                    <div class="media d-flex">
+                      <div class="align-self-center display-4 ml-4 text-warning">
+                        <i class="fa fa-bell"></i>
+                      </div>
+                      <div class="media-body text-right">
+                        <h3 id="ordersCount">---</h3>
+                        <span>To day Alerts</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+    
+          
+          </div>
+
+        </main>
+      </div>
+
+    </div>
+
+    <%- include partials/scripts.ejs %>
+
+    <script>
+      $(document).ready(function() {
+        // getDashboard()
+        // getDashboardInterval()
+
+      })
+
+      const pushMenu = () => {
+        const leftMenu = document.getElementById('leftMenu')
+        // console.log('leftMenu =>', leftMenu)
+        const navbarMenu = document.getElementById('navbarMenu')
+        // console.log('navbarMenu =>', navbarMenu)
+        var cln = leftMenu.cloneNode(true);
+        navbarMenu.prepend(cln);     // Append <p> to <div> with id="myDIV"
+      }
+
+      const getDashboard = () => {
+        console.log('getDashboard ')
+        $.ajax({
+          url: "/dashboard/sum",
+          type: "get",
+          data: {},
+          dataType: "json",
+          contentType: false,
+          processData: false,
+          success: function (response) {
+            // console.log( "response: ", response, JSON.stringify(response) );
+            $("#devicesCount").text(response.devicesCount)
+            $("#alertsCount").text(response.alertsCount)
+            $("#usersCount").text(response.usersCount)
+            $("#otaCount").text(response.otaCount)
+            $("#feedCount").text(response.feedCount)
+          },
+          error: function(jqXHR, textStatus, errorThrown) {
+            // console.log(textStatus, errorThrown, jqXHR);
+            const errCode = jqXHR.status
+            if(errCode==401) return window.location.replace("/users/login");
+
+            Swal.fire({
+              position: 'top-end',
+              icon: 'error',
+              title: errorThrown,
+              text: window.location.origin + this.url,
+              showConfirmButton: false,
+              timer: 3000
+            })
+
+          }
+        });
+      }
+
+      const getDashboardInterval = () => {
+        setInterval(()=>getDashboard(), 30*1000)
+      }
+           
+    </script>
+
+    
+  </body>
+</html>

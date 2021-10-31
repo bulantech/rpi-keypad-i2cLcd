@@ -1,0 +1,78 @@
+<div class="sidebar-sticky">
+  <ul class="nav flex-column" id="leftMenu">
+    <li class="nav-item">
+      <% if(navLink==='dashboard') { %>
+      <a class="nav-link active" href="#">
+      <% } else {%>
+      <a class="nav-link" href="/dashboard">
+      <% } %>
+        <!-- <span data-feather="home"></span> -->
+        <i class="fa fa-tachometer mr-1"></i>
+        Dashboard <span class="sr-only">(current)</span>
+      </a>
+    </li>
+    
+    <li class="nav-item " >
+      <% if(navLink==='orders') { %>
+        <a class="nav-link active" href="#">
+        <% } else {%>
+        <a class="nav-link" href="/orders">
+        <% } %>
+        <!-- <span data-feather="cpu"></span> -->
+        <i class="fa fa-database mr-1"></i>
+        Orders
+      </a>
+    </li>
+
+    <li class="nav-item">
+      <% if(navLink==='users') { %>
+        <a class="nav-link active" href="#">
+        <% } else {%>
+        <a class="nav-link" href="/users">
+        <% } %>
+        <!-- <span data-feather="user"></span> -->
+        <i class="fa fa-users mr-1"></i>
+        Users
+      </a>
+    </li>
+
+    <!-- <li class="nav-item" onclick="return false;" > -->
+    <!--
+    <li class="nav-item"> 
+      <% if(navLink==='alerts') { %>
+        <a class="nav-link active" href="#">
+        <% } else {%>
+        <a class="nav-link" href="/alerts">
+        <% } %>
+        <i class="fa fa-exclamation-circle mr-1"></i>
+        Alerts
+      </a>
+    </li>
+
+    <li class="nav-item">
+      <% if(navLink==='logs') { %>
+        <a class="nav-link active" href="#">
+        <% } else {%>
+        <a class="nav-link" href="/logs">
+        <% } %>
+        <i class="fa fa-file-text mr-1"></i>
+        Logs
+      </a>
+    </li>
+    -->
+
+    <li class="nav-item">
+      <% if(navLink==='setting') { %>
+        <a class="nav-link active" href="#">
+        <% } else {%>
+        <a class="nav-link" href="/setting">
+        <% } %>
+        <!-- <span data-feather="sliders"></span> -->
+        <i class="fa fa-sliders mr-1"></i>
+        Setting
+      </a>
+    </li>
+    
+  </ul>
+
+</div>

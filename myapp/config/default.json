@@ -1,0 +1,36 @@
+{
+	"version": "1.0.0",
+	"jwt": {
+    "secret": "fb98aeff-dea3-4128-82bc-f818e2763afb",
+    "expireHours": 24
+  },
+	"readyPing": true,
+	"skipRFIDNotFound": true,
+	"skipSerialNotFound": false,
+
+	"testMode":true,
+	"test": {
+		"users": [ 
+		  {"tag": "0512854932", "name": "Jone", "userID": "1111", "password":"1234"},
+		  {"tag": "0035526419", "name": "Jone", "userID": "1111", "password":"1234"},
+		  {"tag": "1937879868", "name": "Jone", "userID": "1234", "password":"1234"},
+		  {"tag": "3010006761", "name": "Jone", "userID": "1234", "password":"1234"},
+
+		  {"tag": "3124006404", "name": "Jone", "userID": "1122334455", "password":"1234"},
+		  {"tag": "", "name": "Admin", "userID": "1234", "password":"4321", "maintenance":true}
+		]
+	},
+	"mbPassword": "1234",
+	"price": 32.45,
+	"version": "1.0.0",
+	"vendingId": "0001",
+
+	"timeoutCount": {
+		"menu":30,
+		"fill":15,
+		"alert":3,
+		"skip":10,
+		"ping":5,
+		"show":5
+	}
+}
