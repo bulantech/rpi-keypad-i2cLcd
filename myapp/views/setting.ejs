@@ -38,16 +38,22 @@
 
                     <% for(var i=0; i < data.length; i++) { %>
                        <tr>
-                         <td><%= data[i].key %></td>
+                         <td><%= data[i].lable %></td>
                          <td><%= data[i].value %></td>
                          <td><%= data[i].updateAt %></td>
                          <td><%= data[i].updateBy %></td>
                          <td>
                             <div class="text-center">
-                              <button type="button" class="btn btn-outline-primary btn-sm mx-1" data-toggle="modal" data-target="#modalEditSetting" data-key="<%= data[i].key %>" data-value="<%= data[i].value %>">
-                                <i class="fa fa-edit"></i>
-                                Edit
-                              </button>
+                              <%if (data[i].key === 'mbPassword' || 
+                                data[i].key === 'version' ||
+                                data[i].key === 'vendingID'  ) { %>
+                                <button type="button" class="btn btn-outline-primary btn-sm mx-1" data-toggle="modal" data-target="#modalEditSetting" data-key="<%= data[i].key %>" data-value="<%= data[i].value %>">
+                                  <i class="fa fa-edit"></i>
+                                  Edit
+                                </button>
+                              <% } else { %>                      
+                                Front site only
+                              <% } %>
                             </div>
                           </td>
                        </tr>

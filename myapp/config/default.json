@@ -1,12 +1,15 @@
 {
-	"version": "1.0.0",
+	"version": "0.7.0",
 	"jwt": {
     "secret": "fb98aeff-dea3-4128-82bc-f818e2763afb",
     "expireHours": 24
   },
-	"readyPing": true,
+	"readyPing": false,
 	"skipRFIDNotFound": true,
 	"skipSerialNotFound": false,
+	
+	"mbType": "G",
+	"mbType_comment": "D or G",
 
 	"testMode":true,
 	"test": {

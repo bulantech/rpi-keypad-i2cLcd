@@ -1,11 +1,13 @@
-var passport = require('passport');
-var LocalStrategy = require('passport-local').Strategy;
+const passport = require('passport');
+const LocalStrategy = require('passport-local').Strategy;
 
 const ExtractJwt = require("passport-jwt").ExtractJwt;
 const JwtStrategy = require("passport-jwt").Strategy;
 const bcrypt = require('bcrypt');
 
-const nedb = require('./nedb');
+const path = require('path');
+const cwd = process.cwd()
+const nedb = require(path.join(cwd, 'lib', 'nedb') )
 const config = require('config');
 
 const jwtOptions = {

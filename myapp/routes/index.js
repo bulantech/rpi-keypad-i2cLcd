@@ -34,8 +34,9 @@ router.get('/orders', function(req, res, next) {
   const end = new Date();
   end.setHours(23,59,59,999);
 
-  nedb.orders.find({insertAt: {$gte: start, $lt: end}}, function (err, docs) {
+  // nedb.orders.find({insertAt: {$gte: start, $lt: end}}, function (err, docs) {
   // nedb.orders.find({}, function (err, docs) {
+  nedb.orders.find({}).sort({$natural: -1}).limit(25).exec(function (err, docs) {
     // console.log('err, docs =>', err, docs)
     const orders = docs
     res.render('orders', { gTitle: gTitle, title: gTitle + ' - Orders', navLink: 'orders', orders: orders });

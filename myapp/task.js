@@ -1,5 +1,13 @@
 const config = require('config');
 const player = require('play-sound')(opts = {})
+const path = require('path');
+const cwd = process.cwd()
+const nedb = require(path.join(cwd, 'lib', 'nedb') )
+
+// nedb.setting.find({}, function (err, docs) {
+// 	console.log('setting =>', err, docs)
+// 	if(err) return console.log(err)
+// })
 
 //======================== variable
 let gState = 'init'
@@ -24,13 +32,13 @@ let litresText=''
 let maintenanceMode=false
 let blink=false
 
-let priceText=''
-
 let dateText=''
 let timeText=''
 let digiCount=0
 let setDate=true
 let index=0
+let pingData=''
+let pingDataArr=''
 
 let port
 let portOk=false
@@ -46,6 +54,9 @@ let alert = {}
 // length 1 					1 		2 					v 							1
 // 				: 					D/G 	01-FF 			Check requires 	;
 
+let cmdFuelType = config.get('mbType') // D or G
+let cmdFuelTypeBuf = ''
+
 const cmd = {	
 	start: 	':',
 	end: 		';',
@@ -54,29 +65,37 @@ const cmd = {
 	Play_sound: 		'03', // XX
 	Set_flow_sensor:'04', // XXXXX
 	Set_fuel_type:  '05', // Y (D/G)
-	reset_fuel_tank_to_full: '06200', //200=liters
+	reset_fuel_tank_to_full: '06', //200=liters
 	Set_minimum_price: 		'08', // YY 
 	clear_stored_amount: 	'0A', // XXXX (password)
+
 	sale_by_member_debit_money: 	'0B', // XXXXmmmm
+	sale_by_member_debit_liters: 	'10', // XXXXmmmm
+	sale_by_member_debit_full: 	'11', // 
+
 	set_value_of_K_of_dispenser: 	'0C', // YY (0_50)
 	set_value_of_K_of_Liter_range:'0D', // LLLKKKK
 	check_status_PING: '0E', //Null
 }
 
-const maintenanceMenu = [
-	'Set oil price',
-	'Set date time',
-	'Add users',
-	'Test control M/B',
-	'Ping control M/B',
-	'Tank volume',
-	'Flow K volume',
-	'Clear/reset',
+const maintenanceMenu = [	  
+	'Set date time', //01
+	'Set fuel price', //02 
+	'Play sound', //03 //xx
+	'Set flow sensor', //'04', // XXXXX
+	'Set fuel type', //05
+	'Reset full tank', //06
+	'Set min price', //08
+	'Clear amount', //0A
+	'Set K dispenser', //0C
+	// 'Set K Liter', //'0D', // LLLKKKK
+	'Ping control M/B', //0E
+	// 'Clear/reset',
+	// 'Add users',	
 	'Reboot',
-	'Exit',
+	'Exit, to ready',
 ]
 let menuCount=0
-
 
 // test data ===================================
 // test user rfid
@@ -92,12 +111,80 @@ const skipSerialNotFound = config.get('skipSerialNotFound');
 
 // read from database
 let orderID = 0 
-let cmdFuelType="D"
-let mbPassword = config.get('mbPassword');
-let price = config.get('price');
-let version = config.get('version');
-let vendingId = config.get('vendingId');
 
+let mbPassword = '4321' //config.get('mbPassword');
+nedb.setting.findOne({key: 'mbPassword'}, function (err, doc) {
+	// console.log(err, doc)
+	if(err) return console.log(err)
+	if(!doc) return console.log('findOne price doc=>', doc)
+	if(doc.value.indexOf('.') < 0) price = doc.value+'.00'
+	mbPassword = doc.value
+})
+let mbPasswordText=''
+
+let price = 99.99 //config.get('price');
+nedb.setting.findOne({key: 'price'}, function (err, doc) {
+	// console.log(err, doc)
+	if(err) return console.log(err)
+	if(!doc) return console.log('findOne price doc=>', doc)
+	if(doc.value.indexOf('.') < 0) price = doc.value+'.00'
+	price = doc.value
+})
+let priceText=''
+
+let version = '9.9.9' //config.get('version');
+nedb.setting.findOne({key: 'version'}, function (err, doc) {
+	if(err) return console.log(err)
+	if(!doc) return console.log('findOne version doc=>', doc)
+	version = doc.value
+})
+
+let vendingId = '9999' //config.get('vendingId');
+nedb.setting.findOne({key: 'vendingID'}, function (err, doc) {
+	if(err) return console.log(err)
+	if(!doc) return console.log('findOne vendingID doc=>', doc)
+	vendingId = doc.value
+})
+
+let fullTank = 999 //config.get('vendingId');
+nedb.setting.findOne({key: 'fullTank'}, function (err, doc) {
+	if(err) return console.log(err)
+	if(!doc) return console.log('findOne fullTank doc=>', doc)
+	fullTank = doc.value
+})
+let fullTankText = ''
+
+let minPrice = 99
+nedb.setting.findOne({key: 'minPrice'}, function (err, doc) {
+	if(err) return console.log(err)
+	if(!doc) return console.log('findOne minPrice doc=>', doc)
+	minPrice = doc.value*1
+})
+let minPriceText = ''
+
+let flowSensor = 99999
+nedb.setting.findOne({key: 'flowSensor'}, function (err, doc) {
+	if(err) return console.log(err)
+	if(!doc) return console.log('findOne flowSensor doc=>', doc)
+	flowSensor = doc.value*1
+})
+let flowSensorText = ''
+
+let playSound = 99
+nedb.setting.findOne({key: 'playSound'}, function (err, doc) {
+	if(err) return console.log(err)
+	if(!doc) return console.log('findOne playSound doc=>', doc)
+	playSound = doc.value*1
+})
+let playSoundText = '' 
+
+let kDispenser = 99
+nedb.setting.findOne({key: 'kDispenser'}, function (err, doc) {
+	if(err) return console.log(err)
+	if(!doc) return console.log('findOne kDispenser doc=>', doc)
+	kDispenser = doc.value*1
+})
+let kDispenserText = ''
 
 
 //======================== lcd
@@ -461,19 +548,48 @@ const checkKey = (col) => {
 
 		case 'maintenance-menu': 
 			switch(key) {
+				case '7': if(--menuCount < 0) menuCount=maintenanceMenu.length-1; break;
 				case '*': if(++menuCount >= maintenanceMenu.length) menuCount=0; break;
 				case '#': 
 					switch(maintenanceMenu[menuCount]) {
-						case 'Set oil price': return task('Set-oil-price'); break;
-						case 'Set date time': return task('Set-date-time'); break;
-						case 'Add users': return task('Add users'); break;
-						case 'Test control M/B': return task('Test-control-M/B'); break;
-						case 'Ping control M/B': return task('Ping-control-M/B'); break;
-						case 'Tank volume': return task('Tank-volume'); break;
-						case 'Flow K volume': return task('Flow-K-volume'); break;
-						case 'Clear/reset': return task('Clear/reset'); break;
+						case 'Set fuel price': return task('Set fuel price'); break; 
+						case 'Reset full tank': return task('Reset full tank'); break;   	
+						case 'Set flow sensor': return task('Set flow sensor'); break;					
+						case 'Set min price': return task('Set min price'); break;
+						case 'Play sound': return task('Play sound'); break; 
+						case 'Set K dispenser': return task('Set K dispenser'); break;
+						case 'Set fuel type': return task('Set fuel type'); break;
+						case 'Set date time': return task('Set date time'); break;
+						// case 'Add users': return task('Add users'); break;
+						case 'Ping control M/B': 
+							lcd.printLineSync(0, '    Ping ...    ');
+							lcd.printLineSync(1, '                ');
+						
+							clearTimeout(pingTimeout)
+							clearTimeout(timeoutMenu)
+							pingTimeout = setTimeout(()=>{
+								task('Not respond')
+							}, pingTimeoutCount*1000)
+
+							gState = 'Ping control M/B'	
+							return serialTransmit('Ping control M/B'); 
+						break;
+					
+						case 'Clear amount': 
+							lcd.printLineSync(0, 'Clear amount ...');
+							lcd.printLineSync(1, '                ');
+						
+							clearTimeout(pingTimeout)
+							clearTimeout(timeoutMenu)
+							pingTimeout = setTimeout(()=>{
+								task('Not respond')
+							}, pingTimeoutCount*1000)
+
+							gState = 'Clear amount'	
+							return serialTransmit('Clear amount'); 
+						break;
 						case 'Reboot': return task('Reboot'); break;
-						case 'Exit': return task('ready'); break;
+						case 'Exit, to ready': return task('ready'); break;
 						break;
 					}
 				break;
@@ -488,34 +604,298 @@ const checkKey = (col) => {
 			}, menuTimeoutCount*1000)	
 		break;
 
-		case 'Set-oil-price':
+		case 'Set fuel price':
 			switch(key) {
 				case '*': 
-					if(priceText.length) priceText = priceText.slice(0, -1); 
-					else return task('ready'); 
+					clearInterval(intervalMenu)
+					return task('maintenance-menu'); 
 				break;
 				case '#': 
-					if(priceText.length) {
-						price = priceText*1
-						console.log('price', price)
-						return task('done'); 
-					}
+					clearInterval(intervalMenu)
+					lcd.printLineSync(0, 'Setting sending.'); 
+				  lcd.printLineSync(1, '      ...       ');
+				  serialReceiveACK = true
+					serialTransmit('Set fuel price')		
+					clearTimeout(pingTimeout)
+					pingTimeout = setTimeout(()=>{
+						task('Not respond')
+					}, pingTimeoutCount*1000)	
 				break;
 				case '1': case '2': case '3': case '4': case '5': 
 				case '6': case '7': case '8': case '9': case '0': 
-					if(priceText.length<2) priceText += key
+					priceText = priceText.substring(0, index) + key + priceText.substring(index + 1);
+					// console.log('priceText, index, key', priceText, index, key)
+					if(++digiCount>=4) { digiCount=0; index=0; }
+					// set index blink
+					if(index>=1) index=digiCount+1
+					else index=digiCount
+
+					clearTimeout(timeoutMenu)
+					timeoutMenu = setTimeout(()=>{
+						task('timeout')
+					}, menuTimeoutCount*1000)	
+
 				break;
 			}
 
-			lcd.printLineSync(0, 'Price/Litres> '+priceText.padStart(2, ' '));
-			if(!priceText.length) lcd.printLineSync(1, 'EXIT(*)    OK(#)');
-			else lcd.printLineSync(1, 'CLEAR(*)   OK(#)');
-
-			clearTimeout(timeoutMenu)
-			timeoutMenu = setTimeout(()=>{				
-				task('timeout')
-			}, menuTimeoutCount*1000)	
 		break
+
+		case 'Reset full tank': 
+			switch(key) {
+				case '*': 
+					clearInterval(intervalMenu)
+					return task('maintenance-menu'); 
+				break;
+				case '#': 
+					clearInterval(intervalMenu)
+					lcd.printLineSync(0, 'Setting sending.'); 
+				  lcd.printLineSync(1, '      ...       ');
+				  serialReceiveACK = true
+					serialTransmit('Reset full tank')		
+					clearTimeout(pingTimeout)
+					pingTimeout = setTimeout(()=>{
+						task('Not respond')
+					}, pingTimeoutCount*1000)	
+				break;
+				case '1': case '2': case '3': case '4': case '5': 
+				case '6': case '7': case '8': case '9': case '0': 
+					fullTankText = fullTankText.substring(0, index) + key + fullTankText.substring(index + 1);
+					// console.log('priceText, index, key', priceText, index, key)
+					if(++digiCount>=4) { digiCount=0; index=0; }
+					// set index blink
+					// if(index>=1) index=digiCount+1
+					// else index=digiCount
+					index=digiCount
+
+					clearTimeout(timeoutMenu)
+					timeoutMenu = setTimeout(()=>{
+						task('timeout')
+					}, menuTimeoutCount*1000)	
+
+				break;
+			}
+
+		break  
+
+		case 'Set flow sensor': 
+			switch(key) {
+				case '*': 
+					clearInterval(intervalMenu)
+					return task('maintenance-menu'); 
+				break;
+				case '#': 
+					clearInterval(intervalMenu)
+					lcd.printLineSync(0, 'Set flow sensor '); 
+				  lcd.printLineSync(1, '      ...       ');
+				  serialReceiveACK = true
+					serialTransmit('Set flow sensor')		
+					clearTimeout(pingTimeout)
+					pingTimeout = setTimeout(()=>{
+						task('Not respond')
+					}, pingTimeoutCount*1000)	
+				break;
+				case '1': case '2': case '3': case '4': case '5': 
+				case '6': case '7': case '8': case '9': case '0': 
+					flowSensorText = flowSensorText.substring(0, index) + key + flowSensorText.substring(index + 1);
+					// console.log('priceText, index, key', priceText, index, key)
+					if(++digiCount>=5) { digiCount=0; index=0; }
+					// set index blink
+					// if(index>=1) index=digiCount+1
+					// else index=digiCount
+					index=digiCount
+
+					clearTimeout(timeoutMenu)
+					timeoutMenu = setTimeout(()=>{
+						task('timeout')
+					}, menuTimeoutCount*1000)	
+
+				break;
+			}
+
+		break
+
+		case 'Set min price': 
+			switch(key) {
+				case '*': 
+					clearInterval(intervalMenu)
+					return task('maintenance-menu'); 
+				break;
+				case '#': 
+					clearInterval(intervalMenu)
+					lcd.printLineSync(0, 'Setting sending.'); 
+				  lcd.printLineSync(1, '      ...       ');
+				  serialReceiveACK = true
+					serialTransmit('Set min price')		
+					clearTimeout(pingTimeout)
+					pingTimeout = setTimeout(()=>{
+						task('Not respond')
+					}, pingTimeoutCount*1000)	
+				break;
+				case '1': case '2': case '3': case '4': case '5': 
+				case '6': case '7': case '8': case '9': case '0': 
+					minPriceText = minPriceText.substring(0, index) + key + minPriceText.substring(index + 1);
+					// console.log('priceText, index, key', priceText, index, key)
+					if(++digiCount>=2) { digiCount=0; index=0; }
+					// set index blink
+					// if(index>=1) index=digiCount+1
+					// else index=digiCount
+					index=digiCount
+
+					clearTimeout(timeoutMenu)
+					timeoutMenu = setTimeout(()=>{
+						task('timeout')
+					}, menuTimeoutCount*1000)	
+
+				break;
+			}
+
+		break 
+
+		case 'Play sound': 
+			switch(key) {
+				case '*': 
+					clearInterval(intervalMenu)
+					return task('maintenance-menu'); 
+				break;
+				case '#': 
+					clearInterval(intervalMenu)
+					lcd.printLineSync(0, ' Set Play Sound '); 
+				  lcd.printLineSync(1, '      ...       ');
+				  serialReceiveACK = true
+					serialTransmit('Play sound')		
+					clearTimeout(pingTimeout)
+					pingTimeout = setTimeout(()=>{
+						task('Not respond')
+					}, pingTimeoutCount*1000)	
+				break;
+				case '1': case '2': case '3': case '4': case '5': 
+				case '6': case '7': case '8': case '9': case '0': 
+					playSoundText = playSoundText.substring(0, index) + key + playSoundText.substring(index + 1);
+					// console.log('priceText, index, key', priceText, index, key)
+					if(++digiCount>=2) { digiCount=0; index=0; }
+					// set index blink
+					// if(index>=1) index=digiCount+1
+					// else index=digiCount
+					index=digiCount
+
+					clearTimeout(timeoutMenu)
+					timeoutMenu = setTimeout(()=>{
+						task('timeout')
+					}, menuTimeoutCount*1000)	
+
+				break;
+			}
+
+		break 
+
+		case 'Set K dispenser': 
+			switch(key) {
+				case '*': 
+					clearInterval(intervalMenu)
+					return task('maintenance-menu'); 
+				break;
+				case '#': 
+					clearInterval(intervalMenu)
+					lcd.printLineSync(0, 'Set K dispenser '); 
+				  lcd.printLineSync(1, '      ...       ');
+				  serialReceiveACK = true
+					serialTransmit('Set K dispenser')		
+					clearTimeout(pingTimeout)
+					pingTimeout = setTimeout(()=>{
+						task('Not respond')
+					}, pingTimeoutCount*1000)	
+				break;
+				case '1': case '2': case '3': case '4': case '5': 
+				case '6': case '7': case '8': case '9': case '0': 
+					clearTimeout(timeoutMenu)
+					timeoutMenu = setTimeout(()=>{
+						task('timeout')
+					}, menuTimeoutCount*1000)	
+
+					if(index==0 && (key*1) > 5) return
+					if(index==1 && kDispenserText[0]=='5' && (key*1) > 0) return
+
+					kDispenserText = kDispenserText.substring(0, index) + key + kDispenserText.substring(index + 1);
+					if(++digiCount>=2) { digiCount=0; index=0; }
+					index=digiCount
+
+					if(kDispenserText[0]=='5') { 
+						let a = kDispenserText.split("");
+				    a[1] = '0';
+				    kDispenserText = a.join("");
+					}
+					console.log('kDispenserText, kDispenserText[0], kDispenserText[1]', kDispenserText, kDispenserText[0], kDispenserText[1])
+
+				break;
+			}
+ 
+		break
+
+		case 'Set fuel type':
+			switch(key) {
+				// case '*': return task('maintenance-menu'); break;
+				case '1': lcd.printLineSync(0, 'Set fuel type> D'); cmdFuelTypeBuf='D'; break;
+				case '2': lcd.printLineSync(0, 'Set fuel type> G'); cmdFuelTypeBuf='G'; break;
+				case '#': 
+					// cmdFuelType = cmdFuelTypeBuf
+					// return task('maintenance-menu'); break;
+					lcd.printLineSync(0, 'Setting sending.'); 
+				  lcd.printLineSync(1, '      ...       ');
+				  serialReceiveACK = true
+					serialTransmit('Set fuel type')		
+					clearTimeout(pingTimeout)
+					pingTimeout = setTimeout(()=>{
+						task('Not respond')
+					}, pingTimeoutCount*1000)	
+				break;
+			}	
+		break
+
+		case 'Ping show data':
+			switch(key) {
+				case '*': return task('maintenance-menu'); break;
+				case '#': 
+					const name = ['Fuel', 'd1', 'd2', 'd3', 'd4', 'Time', 'Date']
+					lcd.printLineSync(0, name[index] + ': ' + pingDataArr[index].padEnd(10, ' '));
+					lcd.printLineSync(1, 'BACK(*)  NEXT(#)');
+					if(++index >= 7) index = 0
+
+					clearTimeout(timeoutMenu)
+					timeoutMenu = setTimeout(()=>{
+						task('timeout')
+					}, menuTimeoutCount*1000)	
+				break;
+			}		
+		break
+
+		case 'Setting is ok':
+			switch(key) {
+				case '*': return task(gStateLast); break;
+				case '#': 
+					if(gStateLast==='Set fuel price') {
+						console.log('Controller must reset')
+					}
+					menuCount=0
+					return task('maintenance-menu');
+				break;
+			}		
+		break;
+
+		case 'Not respond':
+			switch(key) {
+				case '*': return task(gStateLast); break;
+				case '#': menuCount=0; return task('maintenance-menu'); break;
+				break;
+			}		
+		break;
+
+		case 'Error respond':
+			switch(key) {
+				case '*': return task(gStateLast); break;
+				case '#': menuCount=0; return task('maintenance-menu'); break;
+				break;
+			}		
+		break;
 
 		case 'Reboot': 
 			switch(key) {
@@ -534,7 +914,7 @@ const checkKey = (col) => {
 			}			
 		break;
 
-		case 'Set-date-time':
+		case 'Set date time':
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{				
 				task('timeout')
@@ -781,13 +1161,60 @@ const serialTransmit = (command) => {
 		case 'check_status_PING':
 			cmdNow = cmd.start + cmdFuelType + cmd.check_status_PING + cmd.end	
 		break
+
+		case 'Set fuel price':
+			gStateLast = gState
+			cmdNow = cmd.start + cmdFuelType + cmd.Set_fuel_price + priceText + cmd.end	
+		break
+
+		case 'Reset full tank': 
+			gStateLast = gState
+			cmdNow = cmd.start + cmdFuelType + cmd.reset_fuel_tank_to_full + fullTankText + cmd.end	
+		break 
+
+		case 'Set flow sensor': 
+			gStateLast = gState
+			cmdNow = cmd.start + cmdFuelType + cmd.Set_flow_sensor + flowSensorText + cmd.end	
+		break
+
+		case 'Set min price': 
+			gStateLast = gState
+			cmdNow = cmd.start + cmdFuelType + cmd.Set_minimum_price + minPriceText + cmd.end	
+		break 
+
+		case 'Play sound': 
+			gStateLast = gState
+			cmdNow = cmd.start + cmdFuelType + cmd.Play_sound + playSoundText + cmd.end	
+		break 
+
+		case 'Set K dispenser': 
+			gStateLast = gState
+			cmdNow = cmd.start + cmdFuelType + cmd.set_value_of_K_of_dispenser + kDispenserText + cmd.end	
+		break
+
+		case 'Set fuel type':
+			gStateLast = gState
+			cmdNow = cmd.start + cmdFuelType + cmd.Set_fuel_type + cmdFuelTypeBuf + cmd.end	
+		break
+
+		case 'Ping control M/B':
+			gStateLast = gState
+			cmdNow = cmd.start + cmdFuelType + cmd.check_status_PING + cmd.end
+		break 
+
+		case 'Clear amount':
+			gStateLast = 'maintenance-menu'
+			serialReceiveACK = true
+			cmdNow = cmd.start + cmdFuelType + cmd.clear_stored_amount + mbPassword + cmd.end
+		break
+
 		case 'sale_by_member_debit_money':
 			// orderIDtext = (++orderID).toString().padStart(4, '0')
 			switch(gState) {
 				case 'fill-full-ack':
 					transaction.orderType = 'full'
-					cmdNow = cmd.start + cmdFuelType + cmd.sale_by_member_debit_money + 
-						mbPassword + 'FULL' + cmd.end			
+					cmdNow = cmd.start + cmdFuelType + cmd.sale_by_member_debit_full + 
+						mbPassword + cmd.end			
 				break
 				case 'fill-bath-ack':
 					console.log('price, bathText =>', price, bathText)
@@ -799,11 +1226,11 @@ const serialTransmit = (command) => {
 				case 'fill-litres-ack':
 					bathText = ( Math.floor(litresText*price) +'')
 					transaction.petrolQty = litresText*1
-					transaction.amount = bathText*1
+					// transaction.amount = bathText*1
 					transaction.orderType = 'quantity'
 					console.log('price, litresText, bathText =>', price, litresText, bathText)
-					cmdNow = cmd.start + cmdFuelType + cmd.sale_by_member_debit_money + 
-						mbPassword + bathText + cmd.end			
+					cmdNow = cmd.start + cmdFuelType + cmd.sale_by_member_debit_liters + 
+						mbPassword + litresText + cmd.end			
 				break
 			}
 		break
@@ -822,7 +1249,7 @@ const serialTransmit = (command) => {
 
 const serialReceive = (buf) => {
 	const bufChar = buf.toString()
-	// console.log('serialReceiveCmd bufChar =>', bufChar)
+	console.log('serialReceiveCmd bufChar =>', bufChar)
 	if(serialReceiveACK) {
 		ackBuf += bufChar
 		if(ackBuf.length < 2) return
@@ -838,9 +1265,168 @@ const serialReceive = (buf) => {
 					gStateLast = gState
 					task('fill-wait-press')
 				break
+
+				case 'Set fuel price':  
+					console.log('serialReceive',gState, ackBuf, priceText)	
+					price = priceText//*1	   
+					alert = {
+						insertAt: new Date(),
+						action: 'Set fuel price',
+						mesage: 'OK price='+price
+					}
+					console.log(alert)
+					nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
+					  console.log(err, newDoc)
+					});
+
+					// update setting
+					db.setting.update({ key: 'price' }, { $set: {value: price} }, { upsert: true }, function (err, numReplaced) {
+					  console.log(err, numReplaced)
+					});
+			
+					task('Setting is ok')
+				break 
+
+				case 'Set flow sensor': 
+					console.log('serialReceive',gState, ackBuf, flowSensorText)	
+					flowSensor = flowSensorText*1	   
+					alert = {
+						insertAt: new Date(),
+						action: 'Set flow sensor',
+						mesage: 'OK flowSensor='+flowSensor
+					}
+					console.log(alert)
+					nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
+					  console.log(err, newDoc)
+					});
+
+					// update setting
+					db.setting.update({ key: 'flowSensor' }, { $set: {value: flowSensor} }, { upsert: true }, function (err, numReplaced) {
+					  console.log(err, numReplaced)
+					});
+			
+					task('Setting is ok')
+				break
+
+				case 'Reset full tank': 
+					console.log('serialReceive',gState, ackBuf, fullTankText)	
+					fullTank = fullTankText*1	
+					alert = {
+						insertAt: new Date(),
+						action: 'Reset full tank',
+						mesage: 'OK full Tank='+fullTank
+					}
+					console.log(alert)
+					nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
+					  console.log(err, newDoc)
+					});
+
+					// update setting
+					db.setting.update({ key: 'fullTank' }, { $set: {value: fullTank} }, { upsert: true }, function (err, numReplaced) {
+					  console.log(err, numReplaced)
+					});
+			
+					task('Setting is ok')
+				break 
+
+				case 'Set min price': 
+					console.log('serialReceive',gState, ackBuf, minPriceText)	
+					minPrice = minPriceText*1	
+					alert = {
+						insertAt: new Date(),
+						action: 'Set min price',
+						mesage: 'OK full minPrice='+minPrice
+					}
+					console.log(alert)
+					nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
+					  console.log(err, newDoc)
+					});
+
+					// update setting
+					db.setting.update({ key: 'minPrice' }, { $set: {value: minPrice} }, { upsert: true }, function (err, numReplaced) {
+					  console.log(err, numReplaced)
+					});
+			
+					task('Setting is ok')
+				break 
+
+				case 'Play sound': 
+					console.log('serialReceive',gState, ackBuf, playSoundText)	
+					playSound = playSoundText*1	
+					alert = {
+						insertAt: new Date(),
+						action: 'Set play sound',
+						mesage: 'OK playSound='+playSound
+					}
+					console.log(alert)
+					nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
+					  console.log(err, newDoc)
+					});
+
+					// update setting
+					db.setting.update({ key: 'playSound' }, { $set: {value: playSound} }, { upsert: true }, function (err, numReplaced) {
+					  console.log(err, numReplaced)
+					});
+			
+					task('Setting is ok')
+				break 
+
+				case 'Set K dispenser': 
+					console.log('serialReceive',gState, ackBuf, kDispenserText)	
+					kDispenser = kDispenserText*1	
+					alert = {
+						insertAt: new Date(),
+						action: 'Set Set K dispenser',
+						mesage: 'OK k Dispenser='+kDispenser
+					}
+					console.log(alert)
+					nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
+					  console.log(err, newDoc)
+					});
+
+					// update setting
+					db.setting.update({ key: 'kDispenser' }, { $set: {value: kDispenser} }, { upsert: true }, function (err, numReplaced) {
+					  console.log(err, numReplaced)
+					});
+			
+					task('Setting is ok')
+				break
+
+				case 'Set fuel type':
+					console.log('serialReceive <Set fuel type>',gState, ackBuf)	
+					cmdFuelType = cmdFuelTypeBuf	
+					alert = {
+						insertAt: new Date(),
+						action: 'Set fuel type',
+						mesage: 'OK type='+cmdFuelType
+					}
+					console.log(alert)
+					nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
+					  console.log(err, newDoc)
+					});
+			
+					task('Setting is ok')
+				break
+
+				case 'Clear amount':
+					console.log('serialReceive <Clear amount>',gState, ackBuf)	
+					alert = {
+						insertAt: new Date(),
+						action: 'Clear amount',
+						mesage: 'OK'
+					}
+					console.log(alert)
+					nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
+					  console.log(err, newDoc)
+					});
+			
+					task('Setting is ok')
+				break
+
 			}
 		}
 		else {
+			console.log('serialReceive ACk FF =>',gState, ackBuf)
 			switch(gState) {
 				case 'fill-full-ack':
 				case 'fill-bath-ack':
@@ -848,6 +1434,17 @@ const serialReceive = (buf) => {
 					transaction.status = 'error'
 					transaction.detail = 'Return FF'
 					task('fill-error')
+				break
+
+				case 'Set fuel price':  
+				case 'Set flow sensor':
+				case 'Reset full tank': 
+				case 'Set min price': 
+				case 'Play sound':
+				case 'Set K dispenser':
+				case 'Set fuel type':		
+				case 'Clear amount':				
+					task('Error respond')
 				break
 			}
 		}
@@ -861,12 +1458,21 @@ const serialReceive = (buf) => {
 	if(bufChar===cmd.start && (!serialReceiveCmd.length)) return serialReceiveCmd = ':'
 	serialReceiveCmd += bufChar
 	if(bufChar===cmd.end) {
-		console.log('serialReceiveCmd =>', serialReceiveCmd)
+		console.log('serialReceiveCmd =>', gState, serialReceiveCmd)
 		switch(gState) {
 
 			case 'ready':
 				clearTimeout(pingTimeout)
 			break
+
+			case 'Ping control M/B':
+				clearTimeout(pingTimeout)
+				clearTimeout(timeoutMenu)
+				// console.log('Ping control M/B', serialReceiveCmd)
+				pingData = serialReceiveCmd
+				gStateLast = gState
+				task('Ping show data')
+			break 
 
 			case 'fill-wait-press':
 				// :DF,26:22:22,251021;
@@ -926,6 +1532,7 @@ const serialReceive = (buf) => {
 
 				gStateLast = gState
 				task('fill-complete')
+
 			break
 		}
 
@@ -944,6 +1551,15 @@ const task = state => {
 	gState = state
 	switch(state) {
 		case 'init': 
+			alert = {
+				insertAt: new Date(),
+				action: 'info',
+				mesage: 'App restart'
+			}
+			console.log(alert)
+			nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
+			  console.log(err, newDoc)
+			});
 
 			var audio = player.play('./sound/bell.wav', function(err){
 			  if (err) throw err
@@ -966,6 +1582,7 @@ const task = state => {
 			timeoutMenu = setTimeout(()=>{
 				task('init-rfid-0')
 			}, 1*1000)
+
 		break;
 
 		case 'init-rfid-0':
@@ -987,6 +1604,9 @@ const task = state => {
 					mesage: 'RFID Not Found'
 				}
 				console.log(alert)
+				nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
+				  console.log(err, newDoc)
+				});
 
 				lcd.printLineSync(0, 'RFID Not Found  ');
 				lcd.printLineSync(1, 'CHECK(*)        ');
@@ -1024,6 +1644,9 @@ const task = state => {
 					mesage: 'Serial Not Found'
 				}
 				console.log(alert)
+				nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
+				  console.log(err, newDoc)
+				});
 
 				lcd.printLineSync(0, 'Serial Not Found');
 				lcd.printLineSync(1, 'CHECK(*)        ');
@@ -1048,6 +1671,8 @@ const task = state => {
 			password = ''
 			userID = ''
 			gTag = ''
+			menuCount=0
+
 			maintenanceMode = false
 			transaction = {}
 			transaction.petrolPrice = price
@@ -1097,6 +1722,9 @@ const task = state => {
 				mesage: 'M/B not found'
 			}
 			console.log(alert)
+			nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
+			  console.log(err, newDoc)
+			});
 
 		  clearInterval(intervalMenu)
 			lcd.printLineSync(0, 'M/B not found   '); 
@@ -1177,6 +1805,9 @@ const task = state => {
 					mesage: 'User not found '+msg
 				}
 				console.log(alert)
+				nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
+				  console.log(err, newDoc)
+				});
 			}
 
 		  clearInterval(intervalMenu)
@@ -1210,7 +1841,7 @@ const task = state => {
 			timeoutMenu = setTimeout(()=>{
 				task('ready')
 			}, 2*1000)	
-		break;
+		break; 
 
 		case 'auth':
 		  clearInterval(intervalMenu)
@@ -1220,10 +1851,10 @@ const task = state => {
 			else if(userID) user =  users.find((u) => (u.userID===userID) && (u.password===password) )
 			else if(maintenanceMode) user =  users.find((u) => (u.maintenance===true) && (u.password===password) )
 				
-    	if(!user) {
+    	if(!user) { 
     		{
 	    		let msg = ''
-	    		if(gTag) msg='tag:'+tag
+	    		if(gTag) msg='tag:'+gTag
 					else if(userID) msg='userID:'+userID
 					else if(maintenanceMode) msg='maintenanceMode'
 	    		alert = {
@@ -1232,6 +1863,9 @@ const task = state => {
 						mesage: 'Password incorrect '+ msg
 					}
 					console.log(alert)
+					nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
+					  console.log(err, newDoc)
+					});
 				}
 
 				lcd.printLineSync(0, '   Password     ');
@@ -1410,6 +2044,10 @@ const task = state => {
 			if(gStateLast==='fill-wait-press') transaction.detail = 'Not start fill'
 
 			console.log(gState, 'transaction =>', transaction)
+			nedb.orders.insert(transaction, function (err, newDoc) {   // Callback is optional
+			  console.log(err, newDoc)
+			});
+
 			clearInterval(intervalMenu)
 			lcd.printLineSync(0, '  Fill Timeout  ');
 			lcd.printLineSync(1, 'RESET(*) SKIP(#)');
@@ -1422,6 +2060,10 @@ const task = state => {
 
 		case 'fill-error':
 			console.log(gState, 'transaction =>', transaction)
+			nedb.orders.insert(transaction, function (err, newDoc) {   // Callback is optional
+			  console.log(err, newDoc)
+			});
+
 			clearInterval(intervalMenu)
 			lcd.printLineSync(0, '   Fill Error   ');
 			lcd.printLineSync(1, 'RESET(*) SKIP(#)');
@@ -1446,6 +2088,10 @@ const task = state => {
 
 		case 'fill-complete':
 			console.log(gState, 'transaction =>', transaction)
+			nedb.orders.insert(transaction, function (err, newDoc) {   // Callback is optional
+			  console.log(err, newDoc)
+			});
+
 			clearInterval(intervalMenu)
 			lcd.printLineSync(0, ' Fill complete  ');
 			lcd.printLineSync(1, '                ');
@@ -1482,6 +2128,62 @@ const task = state => {
 			}, alertTimeoutCount*1000)	
 		break;
 
+		case 'Setting is ok':
+			clearInterval(intervalMenu)
+			lcd.printLineSync(0, ' Setting is ok  ');
+			lcd.printLineSync(1, 'BACK(*)  MENU(#)');
+			if(gStateLast==='Set fuel price') lcd.printLineSync(1, 'BACK(*) RESET(#)');
+			clearTimeout(pingTimeout)
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('ready')
+			}, menuTimeoutCount*1000)	
+		break;
+
+		case 'Not respond':
+			alert = {
+				insertAt: new Date(),
+				action: gStateLast,
+				mesage: 'Not respond'
+			}
+			console.log(alert)
+			nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
+			  console.log(err, newDoc)
+			});
+
+		  clearInterval(intervalMenu)
+			lcd.printLineSync(0, '  Not respond   '); 
+			lcd.printLineSync(1, 'BACK(*)  MENU(#)');
+
+			clearTimeout(pingTimeout)
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('ready')
+			}, menuTimeoutCount*1000)	
+		break;
+
+		case 'Error respond':
+			alert = {
+				insertAt: new Date(),
+				action: gStateLast,
+				mesage: 'Error respond'
+			}
+			console.log(alert)
+			nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
+			  console.log(err, newDoc)
+			});
+
+		  clearInterval(intervalMenu)
+			lcd.printLineSync(0, '  Error respond '); 
+			lcd.printLineSync(1, 'BACK(*)  MENU(#)');
+
+			clearTimeout(pingTimeout)
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('ready')
+			}, menuTimeoutCount*1000)	
+		break;
+
 		case 'maintenance-to': 
 			clearInterval(intervalMenu)
 
@@ -1495,9 +2197,10 @@ const task = state => {
 		break;
 
 		case 'maintenance-menu': 
-			menuCount=0
+			// menuCount=0
 			lcd.printLineSync(0, maintenanceMenu[menuCount].padEnd(16, ' '));
-			lcd.printLineSync(1, 'NEXT(*)    OK(#)');
+			// lcd.printLineSync(1, 'NO(*)     YES(#)');
+			lcd.printLineSync(1, 'DOWN(* UP(7 OK(#');
 
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{
@@ -1513,21 +2216,224 @@ const task = state => {
 				task('timeout')
 			}, menuTimeoutCount*1000)	
 		break; 
-		case 'Set-oil-price': 
+		case 'Set fuel price': 
 			priceText = price+''
+			digiCount=0; index=0
 			clearInterval(intervalMenu)
 			
-			lcd.printLineSync(0, 'Price/Litres> '+priceText.padStart(2, ' '));
-			if(!priceText.length) lcd.printLineSync(1, 'EXIT(*)    OK(#)');
-			else lcd.printLineSync(1, 'CLEAR(*)   OK(#)');
+			lcd.printLineSync(0, 'Price> '+priceText.padStart(5, ' ') + '    ');
+			lcd.printLineSync(1, 'BACK(*)    OK(#)');
 
 			clearTimeout(timeoutMenu)
 			timeoutMenu = setTimeout(()=>{
 				task('timeout')
 			}, menuTimeoutCount*1000)	
+
+			clearInterval(intervalMenu)
+			intervalMenu = setInterval (()=>{
+				let lcdShow = ''			
+				if(blink) {
+					lcdShow = priceText.substring(0, index) + '_' + priceText.substring(index + 1)
+					blink = false
+				}
+				else {
+					lcdShow = priceText
+					blink = true
+				}
+				lcd.printLineSync(0, 'Price> '+lcdShow.padStart(5, ' ') + '    ');
+				lcd.printLineSync(1, 'BACK(*)    OK(#)');	
+			}, 500)
+		break; 
+
+		case 'Set flow sensor': 
+			flowSensorText = (flowSensor+'').padStart(5, '0')
+			digiCount=0; index=0
+			clearInterval(intervalMenu)
+			
+			lcd.printLineSync(0, 'Flow Sen> '+flowSensorText.padStart(5, ' ') + '    ');
+			lcd.printLineSync(1, 'BACK(*)    OK(#)');
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, menuTimeoutCount*1000)	
+
+			clearInterval(intervalMenu)
+			intervalMenu = setInterval (()=>{
+				// console.log('.')
+				let lcdShow = ''			
+				if(blink) {
+					lcdShow = flowSensorText.substring(0, index) + '_' + flowSensorText.substring(index + 1)
+					blink = false
+					// console.log('x')
+				}
+				else {
+					lcdShow = flowSensorText
+					blink = true
+					// console.log('o')
+				}
+				lcd.printLineSync(0, 'Flow Sen> '+lcdShow.padStart(5, ' ') + '    ');
+				lcd.printLineSync(1, 'BACK(*)    OK(#)');	
+			}, 500)
 		break;
 
-		case 'Set-date-time': 	
+		case 'Reset full tank':  
+			fullTankText = (fullTank+'').padStart(4, '0')
+			digiCount=0; index=0
+			clearInterval(intervalMenu)
+			
+			lcd.printLineSync(0, 'Full> '+fullTankText.padStart(4, ' ') + '         ');
+			lcd.printLineSync(1, 'BACK(*)    OK(#)');
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, menuTimeoutCount*1000)	
+
+			clearInterval(intervalMenu)
+			intervalMenu = setInterval (()=>{
+				let lcdShow = ''			
+				if(blink) {
+					lcdShow = fullTankText.substring(0, index) + '_' + fullTankText.substring(index + 1)
+					blink = false
+				}
+				else {
+					lcdShow = fullTankText
+					blink = true
+				}
+				lcd.printLineSync(0, 'Full> '+lcdShow.padStart(4, ' ') + '         ');
+				lcd.printLineSync(1, 'BACK(*)    OK(#)');	
+			}, 500)
+		break; 
+
+		case 'Set min price':  
+			minPriceText = (minPrice+'').padStart(2, '0')
+			digiCount=0; index=0
+			clearInterval(intervalMenu)
+			
+			lcd.printLineSync(0, 'Min price> '+minPriceText.padStart(2, ' ') + '             ');
+			lcd.printLineSync(1, 'BACK(*)    OK(#)');
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, menuTimeoutCount*1000)	
+
+			clearInterval(intervalMenu)
+			intervalMenu = setInterval (()=>{
+				let lcdShow = ''			
+				if(blink) {
+					lcdShow = minPriceText.substring(0, index) + '_' + minPriceText.substring(index + 1)
+					blink = false
+				}
+				else {
+					lcdShow = minPriceText
+					blink = true
+				}
+				lcd.printLineSync(0, 'Min price> '+lcdShow.padStart(2, ' ') + '             ');
+				lcd.printLineSync(1, 'BACK(*)    OK(#)');	
+			}, 500)
+		break; 
+
+		case 'Play sound':  
+			playSoundText = (playSound+'').padStart(2, '0')
+			digiCount=0; index=0
+			clearInterval(intervalMenu)
+			
+			lcd.printLineSync(0, 'Play sound> '+playSoundText.padStart(2, ' ') + '             ');
+			lcd.printLineSync(1, 'BACK(*)    OK(#)');
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, menuTimeoutCount*1000)	
+
+			clearInterval(intervalMenu)
+			intervalMenu = setInterval (()=>{
+				let lcdShow = ''			
+				if(blink) {
+					lcdShow = playSoundText.substring(0, index) + '_' + playSoundText.substring(index + 1)
+					blink = false
+				}
+				else {
+					lcdShow = playSoundText
+					blink = true
+				}
+				lcd.printLineSync(0, 'Play sound> '+lcdShow.padStart(2, ' ') + '             ');
+				lcd.printLineSync(1, 'BACK(*)    OK(#)');	
+			}, 500)
+		break; 
+
+		case 'Set K dispenser':  
+			kDispenserText = (kDispenser+'').padStart(2, '0')
+			digiCount=0; index=0
+			clearInterval(intervalMenu)
+			
+			lcd.printLineSync(0, 'K dispenser> '+kDispenserText.padStart(2, ' ') + '             ');
+			lcd.printLineSync(1, 'BACK(*)    OK(#)');
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, menuTimeoutCount*1000)	
+
+			clearInterval(intervalMenu)
+			intervalMenu = setInterval (()=>{
+				let lcdShow = ''			
+				if(blink) {
+					lcdShow = kDispenserText.substring(0, index) + '_' + kDispenserText.substring(index + 1)
+					blink = false
+				}
+				else {
+					lcdShow = kDispenserText
+					blink = true
+				}
+				lcd.printLineSync(0, 'K dispenser> '+lcdShow.padStart(2, ' ') + '             ');
+				lcd.printLineSync(1, 'BACK(*)    OK(#)');	
+			}, 500)
+		break;
+
+		case 'Set fuel type':
+			clearInterval(intervalMenu)
+			
+			lcd.printLineSync(0, 'Set fuel type> '+cmdFuelType);
+			lcd.printLineSync(1, '1(D) 2(G)  OK(#)');
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, menuTimeoutCount*1000)	
+		break  
+
+		case 'Ping show data':
+			// :DP9999.00,65,110,1.00,00,15:28:05,100300;
+			index = 0
+			pingDataArr = pingData.split(',')
+
+			if(pingDataArr.length!=7) {
+				console.log('pingDataArr.length!=7', pingDataArr)
+				return task('Error respond')
+			}
+
+			const TimeArr = pingDataArr[5].split(':')
+			const Time = TimeArr[2]+':'+TimeArr[1]+':'+TimeArr[0] 
+			pingDataArr[0] = pingDataArr[0].substring(3, pingDataArr.length);		
+			pingDataArr[5] = Time	
+			pingDataArr[6] = pingDataArr[6].substring(0, pingDataArr.length-1);
+			console.log('pingDataArr', pingDataArr)
+
+			clearInterval(intervalMenu)
+			
+			lcd.printLineSync(0, '   Ping data    ');
+			lcd.printLineSync(1, 'BACK(*)  NEXT(#)');
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, menuTimeoutCount*1000)	
+		break
+
+		case 'Set date time': 	
 			setDate = true
 			digiCount = 0
 			index = 0
