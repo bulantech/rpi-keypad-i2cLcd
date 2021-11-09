@@ -22,6 +22,9 @@ router.get('/dashboard', function(req, res, next) {
   res.render('dashboard', { gTitle: gTitle, title: gTitle + ' - Dashboard', navLink: 'dashboard' });
 });
 
+
+// orders ===============================================================================
+
 router.get('/orders', function(req, res, next) {
   // res.render('index', { title: gTitle });
   if(!('user' in req)) {   
@@ -91,6 +94,9 @@ router.post('/orders/delete', function(req, res) {
   
 });
 
+
+// setting ===============================================================================
+
 router.get('/setting', function(req, res, next) {
   // res.render('index', { title: gTitle });
   if(!('user' in req)) {   
@@ -135,5 +141,76 @@ router.post('/setting/edit', function(req, res, next) {
     // console.log('err, newDoc =>', err, newDoc)
     res.send({ error: null });
   })    
+  
+});
+
+
+// alerts ===============================================================================
+router.get('/alerts', function(req, res, next) {
+  // res.render('index', { title: gTitle });
+  if(!('user' in req)) {   
+    return res.redirect('/users/login');
+  }
+
+  const start = new Date();
+  start.setHours(0,0,0,0);
+
+  const end = new Date();
+  end.setHours(23,59,59,999);
+
+  // nedb.alerts.find({insertAt: {$gte: start, $lt: end}}, function (err, docs) {
+  // nedb.alerts.find({}, function (err, docs) {
+  nedb.alerts.find({}).sort({$natural: -1}).limit(25).exec(function (err, docs) {
+    // console.log('err, docs =>', err, docs)
+    const orders = docs
+    res.render('alerts', { gTitle: gTitle, title: gTitle + ' - Alerts', navLink: 'alerts', orders: orders });
+  });
+  
+}); 
+
+router.post('/alerts', function(req, res, next) {
+  // res.render('index', { title: gTitle });
+  if(!('user' in req)) {   
+    return res.redirect('/users/login');
+  }
+
+  if(!req.body.start) {
+    console.log('Start date not found')
+    res.send({error: 1, msg:'Start date not found'});
+    return
+  }
+
+  if(!req.body.end) {
+    console.log('End date not found')
+    res.send({error: 2, msg:'End date not found'});
+    return
+  }
+
+  const start = new Date(req.body.start);
+  const end = new Date(req.body.end);
+
+  nedb.alerts.find({insertAt: {$gte: start, $lt: end}}, function (err, docs) {
+    console.log('err, docs =>', err, docs)
+    const alerts = docs
+    res.send({ error: null, alerts: alerts });
+  });
+  
+});
+
+router.post('/alerts/delete', function(req, res) {
+  // console.log(req.body)
+  if(!('user' in req)) {   
+    return res.redirect('/');
+  }  
+
+  // Remove multiple documents
+  nedb.alerts.remove({ _id: req.body._id }, { multi: true }, function (err, numRemoved) {
+    if(err) {
+      // console.log(err, numRemoved)
+      res.send({error: 1, msg:'db remove error !!'});
+      return
+    }
+    res.send({ error: null });
+  });
   
 });

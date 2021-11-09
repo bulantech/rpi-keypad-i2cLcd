@@ -3,6 +3,7 @@ const player = require('play-sound')(opts = {})
 const path = require('path');
 const cwd = process.cwd()
 const nedb = require(path.join(cwd, 'lib', 'nedb') )
+const bcrypt = require('bcrypt');
 
 // nedb.setting.find({}, function (err, docs) {
 // 	console.log('setting =>', err, docs)
@@ -34,11 +35,15 @@ let blink=false
 
 let dateText=''
 let timeText=''
+let dtSetMb=''
+let dtSetPi=''
+
 let digiCount=0
 let setDate=true
 let index=0
 let pingData=''
 let pingDataArr=''
+
 
 let port
 let portOk=false
@@ -93,7 +98,7 @@ const maintenanceMenu = [
 	// 'Clear/reset',
 	// 'Add users',	
 	'Reboot',
-	'Exit, to ready',
+	'Exit, to Home',
 ]
 let menuCount=0
 
@@ -104,6 +109,8 @@ const users = config.get('test.users');
 //   {tag: '0443770628', name: 'Jone', userID: '1122334455', password:'1234'},
 //   {tag: '', name: 'Admin', userID: '1234', password:'4321', maintenance:true},
 // ]
+
+let user=null
 
 const readyPing = config.get('readyPing');
 const skipRFIDNotFound = config.get('skipRFIDNotFound');
@@ -350,15 +357,28 @@ const checkKey = (col) => {
 			switch(key) {
 				case '*': task('ready'); break;
 				case '#': 
-				{
-					const user =  users.find((u) => (u.tag === gTag)  )
-					if(user) { 
-						transaction.insertAt = new Date()
-						transaction.tag = gTag
-						return task('password'); 
-					}
-					task('user-not-found');
-				} 
+				// {
+				// 	const user =  users.find((u) => (u.tag === gTag)  )
+				// 	if(user) { 
+				// 		transaction.insertAt = new Date()
+				// 		transaction.tag = gTag
+				// 		return task('password'); 
+				// 	}
+				// 	task('user-not-found');
+				// } 
+					// console.log('========== gTag =>', gTag)
+					nedb.users.findOne({tag: gTag}, function (err, doc) {
+				    console.log('err, doc =>', err, doc)
+				    if(err) return task('System error');
+				    user = doc
+				    if(user) { 
+							transaction.insertAt = new Date()
+							transaction.tag = gTag
+							return task('password'); 
+						}
+						task('user-not-found');
+				  });
+
 				break;				
 			}
 		break
@@ -370,16 +390,28 @@ const checkKey = (col) => {
 					else return task('ready');
 				break;
 				case '#': 
-				{
+				// {
+				// 	if(!userID.length) return
+				// 	const user =  users.find((u) => (u.userID === userID) )
+				// 	if(user) {
+				// 		transaction.insertAt = new Date()
+				// 		transaction.userID = userID
+				// 		return task('password');
+				// 	}
+				// 	return task('user-not-found'); 
+				// }
 					if(!userID.length) return
-					const user =  users.find((u) => (u.userID === userID) )
-					if(user) {
-						transaction.insertAt = new Date()
-						transaction.userID = userID
-						return task('password');
-					}
-					return task('user-not-found'); 
-				}
+					nedb.users.findOne({userID: userID}, function (err, doc) {
+				    console.log('err, doc =>', err, doc)
+				    if(err) return task('System error');
+				    user = doc
+				    if(user) {
+							transaction.insertAt = new Date()
+							transaction.userID = userID
+							return task('password');
+						}
+						task('user-not-found');
+				  });
 				break;
 				case '1': case '2': case '3': case '4': case '5': 
 				case '6': case '7': case '8': case '9': case '0': 
@@ -589,7 +621,7 @@ const checkKey = (col) => {
 							return serialTransmit('Clear amount'); 
 						break;
 						case 'Reboot': return task('Reboot'); break;
-						case 'Exit, to ready': return task('ready'); break;
+						case 'Exit, to Home': return task('ready'); break;
 						break;
 					}
 				break;
@@ -612,7 +644,7 @@ const checkKey = (col) => {
 				break;
 				case '#': 
 					clearInterval(intervalMenu)
-					lcd.printLineSync(0, 'Setting sending.'); 
+					lcd.printLineSync(0, ' Set fuel price '); 
 				  lcd.printLineSync(1, '      ...       ');
 				  serialReceiveACK = true
 					serialTransmit('Set fuel price')		
@@ -839,7 +871,7 @@ const checkKey = (col) => {
 				case '#': 
 					// cmdFuelType = cmdFuelTypeBuf
 					// return task('maintenance-menu'); break;
-					lcd.printLineSync(0, 'Setting sending.'); 
+					lcd.printLineSync(0, '  Set fuel type '); 
 				  lcd.printLineSync(1, '      ...       ');
 				  serialReceiveACK = true
 					serialTransmit('Set fuel type')		
@@ -927,19 +959,22 @@ const checkKey = (col) => {
 				break;
 				case '#': 
 					const dateArr = dateText.split('/')
-					const dateSet = dateArr[2]+'-'+dateArr[1]+'-'+dateArr[0]+' '+timeText
-					console.log('dateSet', dateSet)
-					{
-					var exec = require('child_process').exec; 
-					exec('sudo timedatectl set-ntp false', function(error, stdout, stderr){ 
-						console.log('set-ntp false:',error, stdout, stderr)
-						exec('sudo timedatectl set-time "'+dateSet+'"', function(error, stdout, stderr){ 
-							console.log('set-time:',error, stdout, stderr)
-							// return task('done');
-						});
-					});
-					}
-					return task('done');
+					dtSetPi = dateArr[2]+'-'+dateArr[1]+'-'+dateArr[0]+' '+timeText
+					const dSet = dateArr[2].slice(-2)+dateArr[1]+dateArr[0]
+					const tSet = timeText.split(':').join('')
+					dtSetMb = dSet+tSet
+					// console.log('dtSetPi, dtSetMb', dtSetPi, dtSetMb)
+
+					clearInterval(intervalMenu)
+					lcd.printLineSync(0, '  Set date time '); 
+				  lcd.printLineSync(1, '      ...       ');
+				  serialReceiveACK = true
+					serialTransmit('Set date time')		
+					clearTimeout(pingTimeout)
+					pingTimeout = setTimeout(()=>{
+						task('Not respond')
+					}, pingTimeoutCount*1000)	
+
 				break;
 				case '1': case '2': case '3': case '4': case '5': 
 				case '6': case '7': case '8': case '9': case '0':
@@ -1175,6 +1210,11 @@ const serialTransmit = (command) => {
 		case 'Set flow sensor': 
 			gStateLast = gState
 			cmdNow = cmd.start + cmdFuelType + cmd.Set_flow_sensor + flowSensorText + cmd.end	
+		break 
+
+		case 'Set date time': 
+			gStateLast = gState
+			cmdNow = cmd.start + cmdFuelType + cmd.Set_date_time + dtSetMb + cmd.end	
 		break
 
 		case 'Set min price': 
@@ -1271,10 +1311,10 @@ const serialReceive = (buf) => {
 					price = priceText//*1	   
 					alert = {
 						insertAt: new Date(),
-						action: 'Set fuel price',
-						mesage: 'OK price='+price
+						event: 'Set fuel price',
+						message: 'OK price='+price
 					}
-					console.log(alert)
+					// console.log(alert)
 					nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
 					  console.log(err, newDoc)
 					});
@@ -1292,10 +1332,10 @@ const serialReceive = (buf) => {
 					flowSensor = flowSensorText*1	   
 					alert = {
 						insertAt: new Date(),
-						action: 'Set flow sensor',
-						mesage: 'OK flowSensor='+flowSensor
+						event: 'Set flow sensor',
+						message: 'OK flowSensor='+flowSensor
 					}
-					console.log(alert)
+					// console.log(alert)
 					nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
 					  console.log(err, newDoc)
 					});
@@ -1306,6 +1346,38 @@ const serialReceive = (buf) => {
 					});
 			
 					task('Setting is ok')
+				break 
+
+				case 'Set date time': 
+					console.log('serialReceive',gState, ackBuf, dtSetMb)	
+					flowSensor = flowSensorText*1	   
+					alert = {
+						insertAt: new Date(),
+						event: 'Set date time',
+						message: 'OK Date Time='+dtSetMb
+					}
+					// console.log(alert)
+					nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
+					  console.log(err, newDoc)
+					});
+
+					{
+					var exec = require('child_process').exec; 
+					exec('sudo timedatectl set-ntp false', function(error, stdout, stderr){ 
+						console.log('set-ntp false:',error, stdout, stderr)
+						exec('sudo timedatectl set-time "'+dtSetPi+'"', function(error, stdout, stderr){ 
+							console.log('set-time:',error, stdout, stderr)
+							// return task('done');
+						});
+					});
+					}
+
+					// update setting
+					// db.setting.update({ key: 'flowSensor' }, { $set: {value: flowSensor} }, { upsert: true }, function (err, numReplaced) {
+					//   console.log(err, numReplaced)
+					// });
+			
+					task('Setting is ok')
 				break
 
 				case 'Reset full tank': 
@@ -1313,10 +1385,10 @@ const serialReceive = (buf) => {
 					fullTank = fullTankText*1	
 					alert = {
 						insertAt: new Date(),
-						action: 'Reset full tank',
-						mesage: 'OK full Tank='+fullTank
+						event: 'Reset full tank',
+						message: 'OK full Tank='+fullTank
 					}
-					console.log(alert)
+					// console.log(alert)
 					nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
 					  console.log(err, newDoc)
 					});
@@ -1334,10 +1406,10 @@ const serialReceive = (buf) => {
 					minPrice = minPriceText*1	
 					alert = {
 						insertAt: new Date(),
-						action: 'Set min price',
-						mesage: 'OK full minPrice='+minPrice
+						event: 'Set min price',
+						message: 'OK full minPrice='+minPrice
 					}
-					console.log(alert)
+					// console.log(alert)
 					nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
 					  console.log(err, newDoc)
 					});
@@ -1355,10 +1427,10 @@ const serialReceive = (buf) => {
 					playSound = playSoundText*1	
 					alert = {
 						insertAt: new Date(),
-						action: 'Set play sound',
-						mesage: 'OK playSound='+playSound
+						event: 'Set play sound',
+						message: 'OK playSound='+playSound
 					}
-					console.log(alert)
+					// console.log(alert)
 					nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
 					  console.log(err, newDoc)
 					});
@@ -1376,10 +1448,10 @@ const serialReceive = (buf) => {
 					kDispenser = kDispenserText*1	
 					alert = {
 						insertAt: new Date(),
-						action: 'Set Set K dispenser',
-						mesage: 'OK k Dispenser='+kDispenser
+						event: 'Set Set K dispenser',
+						message: 'OK k Dispenser='+kDispenser
 					}
-					console.log(alert)
+					// console.log(alert)
 					nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
 					  console.log(err, newDoc)
 					});
@@ -1397,10 +1469,10 @@ const serialReceive = (buf) => {
 					cmdFuelType = cmdFuelTypeBuf	
 					alert = {
 						insertAt: new Date(),
-						action: 'Set fuel type',
-						mesage: 'OK type='+cmdFuelType
+						event: 'Set fuel type',
+						message: 'OK type='+cmdFuelType
 					}
-					console.log(alert)
+					// console.log(alert)
 					nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
 					  console.log(err, newDoc)
 					});
@@ -1412,10 +1484,10 @@ const serialReceive = (buf) => {
 					console.log('serialReceive <Clear amount>',gState, ackBuf)	
 					alert = {
 						insertAt: new Date(),
-						action: 'Clear amount',
-						mesage: 'OK'
+						event: 'Clear amount',
+						message: 'OK'
 					}
-					console.log(alert)
+					// console.log(alert)
 					nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
 					  console.log(err, newDoc)
 					});
@@ -1438,6 +1510,7 @@ const serialReceive = (buf) => {
 
 				case 'Set fuel price':  
 				case 'Set flow sensor':
+				case 'Set date time':
 				case 'Reset full tank': 
 				case 'Set min price': 
 				case 'Play sound':
@@ -1553,10 +1626,10 @@ const task = state => {
 		case 'init': 
 			alert = {
 				insertAt: new Date(),
-				action: 'info',
-				mesage: 'App restart'
+				event: 'info',
+				message: 'App restart'
 			}
-			console.log(alert)
+			// console.log(alert)
 			nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
 			  console.log(err, newDoc)
 			});
@@ -1600,10 +1673,10 @@ const task = state => {
 			if(err) {
 				alert = {
 					insertAt: new Date(),
-					action: 'Check RFID',
-					mesage: 'RFID Not Found'
+					event: 'Check RFID',
+					message: 'RFID Not Found'
 				}
-				console.log(alert)
+				// console.log(alert)
 				nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
 				  console.log(err, newDoc)
 				});
@@ -1640,10 +1713,10 @@ const task = state => {
 			if(err) {
 				alert = {
 					insertAt: new Date(),
-					action: 'Check Serial',
-					mesage: 'Serial Not Found'
+					event: 'Check Serial',
+					message: 'Serial Not Found'
 				}
-				console.log(alert)
+				// console.log(alert)
 				nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
 				  console.log(err, newDoc)
 				});
@@ -1672,6 +1745,7 @@ const task = state => {
 			userID = ''
 			gTag = ''
 			menuCount=0
+			user=null
 
 			maintenanceMode = false
 			transaction = {}
@@ -1718,10 +1792,10 @@ const task = state => {
 		case 'ready-not-ping':
 			alert = {
 				insertAt: new Date(),
-				action: 'ping',
-				mesage: 'M/B not found'
+				event: 'ping',
+				message: 'M/B not found'
 			}
-			console.log(alert)
+			// console.log(alert)
 			nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
 			  console.log(err, newDoc)
 			});
@@ -1801,10 +1875,10 @@ const task = state => {
 				else if(gTag) msg = 'tag:'+gTag
 				alert = {
 					insertAt: new Date(),
-					action: 'Check user',
-					mesage: 'User not found '+msg
+					event: 'Check user',
+					message: 'User not found '+msg
 				}
-				console.log(alert)
+				// console.log(alert)
 				nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
 				  console.log(err, newDoc)
 				});
@@ -1845,40 +1919,102 @@ const task = state => {
 
 		case 'auth':
 		  clearInterval(intervalMenu)
-		  
-		  let user = null
-			if(gTag) user =  users.find((u) => (u.tag===gTag) && (u.password===password) )
-			else if(userID) user =  users.find((u) => (u.userID===userID) && (u.password===password) )
-			else if(maintenanceMode) user =  users.find((u) => (u.maintenance===true) && (u.password===password) )
-				
-    	if(!user) { 
-    		{
-	    		let msg = ''
-	    		if(gTag) msg='tag:'+gTag
-					else if(userID) msg='userID:'+userID
-					else if(maintenanceMode) msg='maintenanceMode'
-	    		alert = {
-						insertAt: new Date(),
-						action: 'Check Password',
-						mesage: 'Password incorrect '+ msg
+
+			if(maintenanceMode) {
+				user =  users.find((u) => (u.maintenance===true) && (u.password===password) )	
+	    	if(!user) { 
+	    		{
+		    		let msg = ''
+		    		msg='maintenanceMode'
+		    		alert = {
+							insertAt: new Date(),
+							event: 'Check Password',
+							message: 'Password incorrect '+ msg
+						}
+						// console.log(alert)
+						nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
+						  console.log(err, newDoc)
+						});
 					}
-					console.log(alert)
-					nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
-					  console.log(err, newDoc)
-					});
+
+					lcd.printLineSync(0, '   Password     ');
+					lcd.printLineSync(1, '  incorrect!    ');
+
+					clearTimeout(timeoutMenu)
+					setTimeout(()=>{
+						task('ready')
+					}, 2*1000)	
+					return			
 				}
-
-				lcd.printLineSync(0, '   Password     ');
-				lcd.printLineSync(1, '  incorrect!    ');
-
-				clearTimeout(timeoutMenu)
-				setTimeout(()=>{
-					task('ready')
-				}, 2*1000)	
-				return			
+				return task('maintenance-menu')
 			}
-			if(maintenanceMode) return task('maintenance-menu')
-			task('validation-to')
+			else {
+				console.log('======= user', user)
+				const hash = user.password
+			  bcrypt.compare(password, hash, function(err, res) {
+		      if(!res) { 
+		    		{
+			    		let msg = ''
+			    		if(gTag) msg='tag:'+gTag
+							else if(userID) msg='userID:'+userID
+			    		alert = {
+								insertAt: new Date(),
+								event: 'Check Password',
+								message: 'Password incorrect '+ msg
+							}
+							// console.log(alert)
+							nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
+							  console.log(err, newDoc)
+							});
+						}
+
+						lcd.printLineSync(0, '   Password     ');
+						lcd.printLineSync(1, '  incorrect!    ');
+
+						clearTimeout(timeoutMenu)
+						setTimeout(()=>{
+							task('ready')
+						}, 2*1000)	
+						return			
+					}
+					task('validation-to')
+		    }); 
+			}
+
+
+		 //  let user = null
+			// if(gTag) user =  users.find((u) => (u.tag===gTag) && (u.password===password) )
+			// else if(userID) user =  users.find((u) => (u.userID===userID) && (u.password===password) )
+			// else if(maintenanceMode) user =  users.find((u) => (u.maintenance===true) && (u.password===password) )
+				
+   //  	if(!user) { 
+   //  		{
+	  //   		let msg = ''
+	  //   		if(gTag) msg='tag:'+gTag
+			// 		else if(userID) msg='userID:'+userID
+			// 		else if(maintenanceMode) msg='maintenanceMode'
+	  //   		alert = {
+			// 			insertAt: new Date(),
+			// 			event: 'Check Password',
+			// 			message: 'Password incorrect '+ msg
+			// 		}
+			// 		// console.log(alert)
+			// 		nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
+			// 		  console.log(err, newDoc)
+			// 		});
+			// 	}
+
+			// 	lcd.printLineSync(0, '   Password     ');
+			// 	lcd.printLineSync(1, '  incorrect!    ');
+
+			// 	clearTimeout(timeoutMenu)
+			// 	setTimeout(()=>{
+			// 		task('ready')
+			// 	}, 2*1000)	
+			// 	return			
+			// }
+			// if(maintenanceMode) return task('maintenance-menu')
+			// task('validation-to')
 		break; 
 
 		case 'validation-to':
@@ -2143,10 +2279,10 @@ const task = state => {
 		case 'Not respond':
 			alert = {
 				insertAt: new Date(),
-				action: gStateLast,
-				mesage: 'Not respond'
+				event: gStateLast,
+				message: 'Not respond'
 			}
-			console.log(alert)
+			// console.log(alert)
 			nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
 			  console.log(err, newDoc)
 			});
@@ -2165,10 +2301,10 @@ const task = state => {
 		case 'Error respond':
 			alert = {
 				insertAt: new Date(),
-				action: gStateLast,
-				mesage: 'Error respond'
+				event: gStateLast,
+				message: 'Error respond'
 			}
-			console.log(alert)
+			// console.log(alert)
 			nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
 			  console.log(err, newDoc)
 			});
@@ -2485,6 +2621,16 @@ const task = state => {
 				}
 			}, 500)
 
+		break;
+
+		case 'System error':
+			clearInterval(intervalMenu)
+			lcd.printLineSync(0, '  System error  ');
+			lcd.printLineSync(1, '                ');
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('ready')
+			}, alertTimeoutCount*1000)	
 		break;
 
 	}

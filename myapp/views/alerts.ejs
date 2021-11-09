@@ -1,0 +1,323 @@
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <%- include partials/headTag.ejs %>
+  </head>
+
+  <body>
+    <%- include partials/navbar.ejs %>
+
+    <div class="container-fluid">
+      <div class="row">
+        <nav class="col-md-2 d-none d-md-block bg-light sidebar">
+          <%- include partials/sidebar.ejs %>
+        </nav>
+
+        <main role="main" class="col-md-9 ml-sm-auto col-lg-10 pt-3 px-4">
+          <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
+            <h1 class="h2">Alerts</h1>
+
+            <div class=" row input-daterange">
+              <div class="col-xs-4 form-inline">
+                <label for="" class="form-label mx-2">Start Date</label>
+                <input type="text" class="form-control" name="start">
+              </div>
+              <div class="col-xs-4 form-inline">
+                <label for="" class="form-label mx-2">To</label>
+                <input type="text" class="form-control" name="end">
+              </div>
+            </div>
+
+            <button type="button" class="btn btn-success search-order"  id="btnSearchOrder" >              
+              <i class="fa fa-search search-order"></i> 
+              <i class="fa fa-spinner fa-pulse fa-fw search-order d-none"></i>
+              Go                 
+                         
+            </button>
+          </div>
+
+          <div class="card">
+            <div class="card-content">
+              <div class="card-body">
+
+                <table id="example" class="table table-striped table-bordered" style="width:100%">
+                  <thead class="text-center">
+                      <tr>
+                        <th>Order ID</th>
+                        <th>insertAt</th>  
+
+                        <th>Event</th>  
+                        <th>Message</th>  
+      
+                        <th>Action</th>  
+                      </tr>
+                  </thead>
+                  <tbody class="d-none">
+
+                    <% for(var i=0; i < orders.length; i++) { %>
+                      <tr>
+                        <td><%= orders[i]._id %></td>
+                         <td><%= orders[i].insertAt %></td>
+
+                         <td><%= orders[i].event %></td>
+                         <td><%= orders[i].message %></td>
+                         
+                         <td>
+                          <div class="text-center">
+                            <button type="button" class="btn btn-outline-danger btn-sm mx-1" data-toggle="modal" data-target="#modalDelOrder" data-orderid="<%= orders[i]._id %>">
+                              <i class="fa fa-trash"></i>
+                              Delete
+                            </button>
+
+                          </div>
+                        </td>
+                      </tr>
+                    <% } %>
+                      
+                      
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+        </main>
+      </div>
+    </div>
+
+    <!-- Modal -->
+
+    <div class="modal fade" id="modalDelOrder" tabindex="-1" role="dialog" aria-labelledby="modalDelOrder" aria-hidden="true">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title text-danger" >
+              <i class="fa fa-trash"></i>
+              Delete alert
+            </h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body text-center">
+            <h5>Delete Alert ID "<span class="orderid"></span>" ? </h5>
+          </div>
+          <div class="modal-footer">
+            <h6 id="alertDel" class="text-danger mr-auto">alertDel</h6>
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-danger del-order" id="btnDelConfirm">
+              <i class="fa fa-spinner fa-pulse fa-fw del-order d-none" ></i>
+              Delete
+          </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <%- include partials/scripts.ejs %>
+
+    <script>
+      var users = []
+
+      $(document).ready(function() {
+        // $('#example').DataTable();
+        var table = $('#example').removeAttr('width').DataTable( {
+          // scrollY:        "300px",
+          scrollX:        true,
+          scrollCollapse: true,
+          paging:         true,
+          pageLength: 25,
+          columnDefs: [
+            // { width: 150, targets: 4 }
+            // {
+            //     "targets": [ 0 ],
+            //     "visible": false,
+            //     "searchable": false
+            // }, 
+            {
+              "targets": 1,
+              // "data": null, // Use the full data source object for the renderer's source
+              render: function (data, type, row) {
+                return moment(new Date(data).toString()).format('DD/MM/YYYY HH:mm:ss');
+              }
+            }          
+          ],
+          // fixedColumns: true,
+          fixedColumns: {
+            left: 1,
+            right: 2
+          },
+          dom: 'Bfrtip',
+          buttons: [
+          // 'pdf', 'csv', 'excel'
+            {
+              extend: 'pdf',
+              exportOptions: {
+                columns: ':not(:last-child)',
+              },
+              orientation: 'landscape', //portrait',
+              pageSize: 'A2',
+              customize: function(doc) {
+                doc.content[1].margin = [ 100, 0, 100, 0 ] //left, top, right, bottom
+              }
+            },
+            {
+              extend: 'csv',
+              exportOptions: {
+                columns: ':not(:last-child)',
+              }
+            },
+            {
+              extend: 'excel',
+              exportOptions: {
+                columns: ':not(:last-child)',
+              },
+
+            }  
+          ],
+          initComplete: function( settings, json ) {
+            $('tbody').removeClass('d-none')
+          }
+
+        } ) 
+
+        $('#modalDelOrder').on('show.bs.modal', function (e) {
+          const orderID = $(e.relatedTarget).data('orderid');
+          $(e.currentTarget).find('.orderid').text(orderID);
+
+          $('#modalDelOrder .modal-footer').find('button.del-order').attr("disabled", false);
+          $('#modalDelOrder .fa-spinner.del-order').addClass('d-none')
+          $('#alertDel').text('') 
+        })
+
+        $('#btnDelConfirm').click( function (e) {
+          const orderId = $('#modalDelOrder').find('.orderid').text();
+          $('#modalDelOrder .modal-footer').find('button.del-order').attr("disabled", true);
+          $('#modalDelOrder .fa-spinner.del-order').removeClass('d-none')
+          // console.log('orderId =>', orderId)
+          $.ajax({
+            url: '/alerts/delete', // url where to submit the request
+            type : "POST", // type of action POST || GET
+            dataType : 'json', // data type
+            data : { _id: orderId},
+            success : function(result) { 
+              // console.log(result);
+              setTimeout(()=>{
+                $('#modalDelOrder .modal-footer').find('button.del-order').attr("disabled", false);
+                $('#modalDelOrder .fa-spinner.del-oder').addClass('d-none')
+              },1*1000)
+
+              if(result.error) {
+                $('#alertDel').text(result.msg) 
+              }
+              else {
+                location.reload();
+              }
+              
+              
+            },
+            error: function(xhr, resp, text) {
+                console.log(xhr, resp, text);
+            }
+          })
+        })
+
+        $('.input-daterange').find('input[name="start"]').val(moment(new Date().toString()).format('DD/MM/YYYY'))
+        $('.input-daterange').find('input[name="end"]').val(moment(new Date().toString()).format('DD/MM/YYYY'))
+
+        $('.input-daterange').datepicker({
+          format: "dd/mm/yyyy",
+          language: "th",
+          todayHighlight: true,
+        })
+
+        $('#btnSearchOrder').click( e => {
+          $('#btnSearchOrder').attr('disabled', true)
+          $('#btnSearchOrder').find('.fa-spinner').removeClass('d-none')
+          $('#btnSearchOrder').find('.fa-search').addClass('d-none')
+
+          const startText = $('.input-daterange').find('input[name="start"]').val() + ' 00:00:00'
+          const endText = $('.input-daterange').find('input[name="end"]').val() + ' 23:59:59'
+          const start = moment(startText, 'DD/MM/YYYY hh:mm:ss', 'th').locale('en').toDate()
+          const end = moment(endText, 'DD/MM/YYYY hh:mm:ss', 'th').locale('en').toDate()
+
+          // console.log(start, end)
+          $.ajax({
+            url: '/alerts', // url where to submit the request
+            type : "POST", // type of action POST || GET
+            dataType : 'json', // data type
+            data : {start: start, end: end},
+            success : function(result) {
+              console.log(result);
+              setTimeout(()=>{
+                $('#btnSearchOrder').attr('disabled', false)
+                $('#btnSearchOrder').find('.fa-spinner').addClass('d-none')
+                $('#btnSearchOrder').find('.fa-search').removeClass('d-none')
+              },1*1000)
+
+              if(result.error) {
+                $('#alertDel').text(result.msg) 
+              }
+              else {
+                // location.reload();
+                table.clear();
+                let dataArray = []
+                for(const order of result.orders) {
+                  let newDataArray = []
+
+                  newDataArray.push(order._id)
+                   newDataArray.push(order.insertAt)
+
+                   newDataArray.push(order.fillStartTime)
+                   newDataArray.push(order.fillStartDate)
+                   newDataArray.push(order.remainingPetrol)
+                   newDataArray.push(order.fillPetrol)
+                   newDataArray.push(order.putCoins)
+                   newDataArray.push(order.accumulatedCoins)
+                   newDataArray.push(order.putBanknotes)
+                   newDataArray.push(order.accumulatedBanknotes)
+                   newDataArray.push(order.accumulatedAmount)
+                   newDataArray.push(order.fillEndTime)
+                   newDataArray.push(order.fillEndDate)
+
+                   newDataArray.push(order.version)
+                   newDataArray.push(order.vendingId)
+                   newDataArray.push(order.employeeId)
+                   newDataArray.push(order.petrolPrice)
+                   newDataArray.push(order.petrolQty)
+                   newDataArray.push(order.amount)
+                   newDataArray.push(order.orderType)
+                   newDataArray.push(order.status)
+
+                  newDataArray.push(`
+                    <div class="text-center">
+                      <button type="button" class="btn btn-outline-danger btn-sm mx-1" data-toggle="modal" data-target="#modalDelOrder" data-orderid="${order._id}">
+                        <i class="fa fa-trash"></i>
+                        Delete
+                      </button>
+
+                    </div>
+                  `)
+
+                  // console.log('newDataArray', newDataArray);
+                  dataArray.push(newDataArray)
+                }
+                table.rows.add(dataArray);
+                // console.log('table.draw()');
+                table.draw();
+              }           
+              
+            },
+            error: function(xhr, resp, text) {
+                console.log(xhr, resp, text);
+            }
+          })
+        })
+
+
+      } ); //$(document).ready(function() {
+
+    </script>
+  </body>
+</html>
