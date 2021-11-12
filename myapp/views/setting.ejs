@@ -17,7 +17,11 @@
         <main role="main" class="col-md-9 ml-sm-auto col-lg-10 pt-3 px-4">
           <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
             <h1 class="h2">Setting</h1>
-       
+            <button type="button" class="btn btn-danger mb-0"  id="btnReboot" data-toggle="modal" data-target="#modalReboot">
+              <i class="fa fa-refresh new-user"></i>
+              <!-- <i class="fa fa-spinner fa-pulse fa-fw " style="display: none;"></i> -->
+              <span>Reboot</span>               
+            </button>
           </div>
 
           <div class="card">
@@ -46,6 +50,7 @@
                             <div class="text-center">
                               <%if (data[i].key === 'mbPassword' || 
                                 data[i].key === 'version' ||
+                                data[i].key === 'mainPassword' ||
                                 data[i].key === 'vendingID'  ) { %>
                                 <button type="button" class="btn btn-outline-primary btn-sm mx-1" data-toggle="modal" data-target="#modalEditSetting" data-key="<%= data[i].key %>" data-value="<%= data[i].value %>">
                                   <i class="fa fa-edit"></i>
@@ -117,6 +122,33 @@
 
           </form>
 
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="modalReboot" tabindex="-1" role="dialog" aria-labelledby="modalReboot" aria-hidden="true">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title text-danger" >
+              <i class="fa fa-refresh"></i>
+              Reboot
+            </h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body text-center">
+            <h5>Are you sure to Reboot?</h5>
+          </div>
+          <div class="modal-footer">
+            <!-- <h6 id="alertDel" class="text-danger mr-auto">alertDel</h6> -->
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-danger del-user" id="btnRebootConfirm">
+              <i class="fa fa-spinner fa-pulse fa-fw del-user d-none" ></i>
+              Yes, reboot now
+          </button>
+          </div>
         </div>
       </div>
     </div>
@@ -241,6 +273,31 @@
           $('#modalEditSetting .fa-spinner.edit-setting').addClass('d-none')
           $('#alertEdit').text('') 
           $('#modalEditSetting').find('[name="key"]').attr("disabled", true);
+        })
+
+        $('#btnRebootConfirm').click( function (e) {
+ 
+          $('#modalReboot .fa-spinner.del-user').removeClass('d-none')
+          $.ajax({
+            url: '/reboot', // url where to submit the request
+            type : "POST", // type of action POST || GET
+            dataType : 'json', // data type
+            data : {},
+            success : function(result) {
+              // console.log(result);
+              $('#modalReboot').modal('hide')
+              $('#btnReboot').attr('disabled', true) 
+              $('#btnReboot').find('i').addClass('fa-spin')
+              $('#btnReboot').find('span').text('Reboot, wait a moment')
+              setTimeout(()=>{
+                location.reload();
+              },15*1000)
+
+            },
+            error: function(xhr, resp, text) {
+                console.log(xhr, resp, text);
+            }
+          })
         })
 
       } ); //$(document).ready(function() {

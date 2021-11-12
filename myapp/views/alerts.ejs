@@ -249,7 +249,7 @@
             dataType : 'json', // data type
             data : {start: start, end: end},
             success : function(result) {
-              console.log(result);
+              // console.log(result);
               setTimeout(()=>{
                 $('#btnSearchOrder').attr('disabled', false)
                 $('#btnSearchOrder').find('.fa-spinner').addClass('d-none')
@@ -263,33 +263,15 @@
                 // location.reload();
                 table.clear();
                 let dataArray = []
-                for(const order of result.orders) {
+                for(const order of result.alerts) {
                   let newDataArray = []
 
                   newDataArray.push(order._id)
                    newDataArray.push(order.insertAt)
 
-                   newDataArray.push(order.fillStartTime)
-                   newDataArray.push(order.fillStartDate)
-                   newDataArray.push(order.remainingPetrol)
-                   newDataArray.push(order.fillPetrol)
-                   newDataArray.push(order.putCoins)
-                   newDataArray.push(order.accumulatedCoins)
-                   newDataArray.push(order.putBanknotes)
-                   newDataArray.push(order.accumulatedBanknotes)
-                   newDataArray.push(order.accumulatedAmount)
-                   newDataArray.push(order.fillEndTime)
-                   newDataArray.push(order.fillEndDate)
-
-                   newDataArray.push(order.version)
-                   newDataArray.push(order.vendingId)
-                   newDataArray.push(order.employeeId)
-                   newDataArray.push(order.petrolPrice)
-                   newDataArray.push(order.petrolQty)
-                   newDataArray.push(order.amount)
-                   newDataArray.push(order.orderType)
-                   newDataArray.push(order.status)
-
+                   newDataArray.push(order.event)
+                   newDataArray.push(order.message)
+                  
                   newDataArray.push(`
                     <div class="text-center">
                       <button type="button" class="btn btn-outline-danger btn-sm mx-1" data-toggle="modal" data-target="#modalDelOrder" data-orderid="${order._id}">

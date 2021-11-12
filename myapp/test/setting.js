@@ -71,5 +71,16 @@ data = { key: 'kDispenser', lable: 'K Dispenser', value: 50, updateAt: new Date(
 db.setting.update({ key: data.key }, { $set: data }, { upsert: true }, function (err, numReplaced) {
   console.log(++n, err, numReplaced)
 });
+
+// 11
+data = { key: 'mainPassword', lable: 'Maintenance Password', value: '4321', updateAt: new Date(), updateBy: 'init'}
+db.setting.update({ key: data.key }, { $set: data }, { upsert: true }, function (err, numReplaced) {
+  console.log(++n, err, numReplaced)
+});
   
+// 12
+data = { key: 'kLiter', lable: 'K Liter', value: '5006789', updateAt: new Date(), updateBy: 'init'}
+db.setting.update({ key: data.key }, { $set: data }, { upsert: true }, function (err, numReplaced) {
+  console.log(++n, err, numReplaced)
+});
 

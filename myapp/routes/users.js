@@ -15,7 +15,7 @@ router.get('/', function(req, res, next) {
 
   nedb.users.find({username: {$ne: 'root'}}, function (err, docs) {
     // console.log('err, docs =>', err, docs)
-    res.render('users', { gTitle: gTitle, title: gTitle+' - Users', navLink: 'users', users: docs });
+    res.render('users', { user: req.user, gTitle: gTitle, title: gTitle+' - Users', navLink: 'users', users: docs });
   });
 
 });

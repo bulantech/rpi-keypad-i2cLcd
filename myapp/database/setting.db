@@ -1,10 +1,12 @@
-{"key":"fullTank","lable":"Full Tank","value":200,"updateAt":{"$$date":1635035768922},"updateBy":"init","_id":"3919VfORkJZa6INM"}
-{"key":"fuelType","lable":"Fuel Type","value":"G","updateAt":{"$$date":1635035768922},"updateBy":"init","_id":"9XBIFyFogtoVZdIb"}
-{"key":"price","lable":"Price","value":"31.89","updateAt":{"$$date":1635035768921},"updateBy":"init","_id":"FWC7yeCXqRnzKtmC"}
-{"key":"version","lable":"Version","value":"1.0.0","updateAt":{"$$date":1635035768921},"updateBy":"init","_id":"G2ZW7L6zu0wJSElx"}
-{"key":"kDispenser","lable":"K Dispenser","value":45,"updateAt":{"$$date":1635035768922},"updateBy":"init","_id":"HcdTonmeNokOO6Tr"}
-{"key":"flowSensor","lable":"Flow sensor","value":"99990","updateAt":{"$$date":1635035768922},"updateBy":"init","_id":"JsqjwhBeEtwIEYPR"}
-{"key":"playSound","lable":"Play sound","value":90,"updateAt":{"$$date":1635035768922},"updateBy":"init","_id":"OX5D2YijpoEQFgDA"}
-{"key":"mbPassword","lable":"M/B Password","value":"1234","updateAt":{"$$date":1635035768922},"updateBy":"init","_id":"RELSgAKUMe086BHW"}
-{"key":"minPrice","lable":"Minimum price","value":20,"updateAt":{"$$date":1635035768922},"updateBy":"init","_id":"pxPeJHWMP9RqcH2x"}
-{"key":"vendingID","lable":"Vending ID","value":"1001","updateAt":{"$$date":1635035768921},"updateBy":"init","_id":"yWaXh4t7PBdfpxjS"}
+{"key":"fullTank","lable":"Full Tank","value":200,"updateAt":{"$$date":1636556546253},"updateBy":"init","_id":"3919VfORkJZa6INM"}
+{"key":"fuelType","lable":"Fuel Type","value":"G","updateAt":{"$$date":1636556546253},"updateBy":"init","_id":"9XBIFyFogtoVZdIb"}
+{"key":"mainPassword","lable":"Maintenance Password","value":"4321","updateAt":{"$$date":1636556546254},"updateBy":"init","_id":"Au9W0pU7wjL7P89e"}
+{"key":"price","lable":"Price","value":"31.89","updateAt":{"$$date":1636556546253},"updateBy":"init","_id":"FWC7yeCXqRnzKtmC"}
+{"key":"version","lable":"Version","value":"1.0.0","updateAt":{"$$date":1636556546253},"updateBy":"init","_id":"G2ZW7L6zu0wJSElx"}
+{"key":"kDispenser","lable":"K Dispenser","value":50,"updateAt":{"$$date":1636556546254},"updateBy":"init","_id":"HcdTonmeNokOO6Tr"}
+{"key":"kLiter","lable":"K Liter","value":"7779999","updateAt":{"$$date":1636556546254},"updateBy":"init","_id":"I5iSw7hJESt2Vhvn"}
+{"key":"flowSensor","lable":"Flow sensor","value":"99990","updateAt":{"$$date":1636556546254},"updateBy":"init","_id":"JsqjwhBeEtwIEYPR"}
+{"key":"playSound","lable":"Play sound","value":90,"updateAt":{"$$date":1636556546254},"updateBy":"init","_id":"OX5D2YijpoEQFgDA"}
+{"key":"mbPassword","lable":"M/B Password","value":"1234","updateAt":{"$$date":1636556546254},"updateBy":"init","_id":"RELSgAKUMe086BHW"}
+{"key":"minPrice","lable":"Minimum price","value":20,"updateAt":{"$$date":1636556546253},"updateBy":"init","_id":"pxPeJHWMP9RqcH2x"}
+{"key":"vendingID","lable":"Vending ID","value":"1001","updateAt":{"$$date":1636556546253},"updateBy":"init","_id":"yWaXh4t7PBdfpxjS"}

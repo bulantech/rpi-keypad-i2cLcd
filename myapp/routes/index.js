@@ -19,7 +19,48 @@ router.get('/dashboard', function(req, res, next) {
   if(!('user' in req)) {   
     return res.redirect('/users/login');
   }
-  res.render('dashboard', { gTitle: gTitle, title: gTitle + ' - Dashboard', navLink: 'dashboard' });
+
+  let data = {
+    orders: 0,
+    amounts: 0,
+    users: 0,
+    alerts: 0,
+  }
+
+  const start = new Date();
+  start.setHours(0,0,0,0);
+
+  const end = new Date();
+  end.setHours(23,59,59,999);
+
+  nedb.orders.find({insertAt: {$gte: start, $lt: end}}, function (err, docs) {
+  // nedb.orders.find({}, function (err, docs) {
+  // nedb.orders.find({}).sort({$natural: -1}).limit(25).exec(function (err, docs) {
+    // console.log('err, count =>', err, docs)
+    data.orders = docs.length
+
+    for(order of docs) {
+      data.amounts += order.amount
+    }
+
+    nedb.alerts.count({insertAt: {$gte: start, $lt: end}}, function (err, count) {
+      // console.log('err, count =>', err, count)
+      data.alerts = count
+      nedb.users.count({}, function (err, count) {
+        // console.log('err, count =>', err, count)
+        data.users = count
+        res.render('dashboard', { 
+          user: req.user, 
+          gTitle: gTitle, 
+          title: gTitle + ' - Dashboard', 
+          navLink: 'dashboard',
+          data: data, 
+        });
+      });
+    });
+  });
+
+  
 });
 
 
@@ -42,7 +83,7 @@ router.get('/orders', function(req, res, next) {
   nedb.orders.find({}).sort({$natural: -1}).limit(25).exec(function (err, docs) {
     // console.log('err, docs =>', err, docs)
     const orders = docs
-    res.render('orders', { gTitle: gTitle, title: gTitle + ' - Orders', navLink: 'orders', orders: orders });
+    res.render('orders', { user: req.user, gTitle: gTitle, title: gTitle + ' - Orders', navLink: 'orders', orders: orders });
   });
   
 });
@@ -106,7 +147,7 @@ router.get('/setting', function(req, res, next) {
   nedb.setting.find({}, function (err, docs) {
     console.log('err, docs =>', err, docs)
     const data = docs
-    res.render('setting', { gTitle: gTitle, title: gTitle + ' - Setting', navLink: 'setting', data: data });
+    res.render('setting', { user: req.user, gTitle: gTitle, title: gTitle + ' - Setting', navLink: 'setting', data: data });
   });
   
 });
@@ -163,7 +204,7 @@ router.get('/alerts', function(req, res, next) {
   nedb.alerts.find({}).sort({$natural: -1}).limit(25).exec(function (err, docs) {
     // console.log('err, docs =>', err, docs)
     const orders = docs
-    res.render('alerts', { gTitle: gTitle, title: gTitle + ' - Alerts', navLink: 'alerts', orders: orders });
+    res.render('alerts', { user: req.user, gTitle: gTitle, title: gTitle + ' - Alerts', navLink: 'alerts', orders: orders });
   });
   
 }); 
@@ -213,4 +254,29 @@ router.post('/alerts/delete', function(req, res) {
     res.send({ error: null });
   });
   
+});
+
+// reboot ===============================================================================
+router.post('/reboot', function(req, res, next) {
+  // res.render('index', { title: gTitle });
+  if(!('user' in req)) {   
+    return res.redirect('/users/login');
+  }
+
+  const alert = {
+    insertAt: new Date(),
+    event: 'Reboot',
+    message: 'Reboot by '+req.user.username
+  }
+  // console.log(alert)
+  nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
+    console.log(err, newDoc)
+    res.send({ error: null });
+    setTimeout(()=>{
+      var exec = require('child_process').exec;
+      exec('sudo reboot', function(error, stdout, stderr){ 
+        console.log('Reboot:',error, stdout, stderr)
+      });
+    }, 1*1000)  
+  });
 });

@@ -16,6 +16,11 @@ let gStateLast = ''
 let gTag = ''
 let userID = ''
 let password = ''
+let passwordStart
+
+let userIDAdd = ''
+let passwordAdd = ''
+let passwordAddAgain = ''
 
 let intervalMenu
 let timeoutMenu
@@ -93,10 +98,10 @@ const maintenanceMenu = [
 	'Set min price', //08
 	'Clear amount', //0A
 	'Set K dispenser', //0C
-	// 'Set K Liter', //'0D', // LLLKKKK
+	'Set K Liter', //'0D', // LLLKKKK
 	'Ping control M/B', //0E
 	// 'Clear/reset',
-	// 'Add users',	
+	'Add user',	
 	'Reboot',
 	'Exit, to Home',
 ]
@@ -193,6 +198,15 @@ nedb.setting.findOne({key: 'kDispenser'}, function (err, doc) {
 })
 let kDispenserText = ''
 
+let kLiter = '8889999'
+nedb.setting.findOne({key: 'kLiter'}, function (err, doc) {
+	// console.log(err, doc)
+	if(err) return console.log(err)
+	if(!doc) return console.log('findOne kLiter doc=>', doc)
+	kLiter = doc.value
+})
+let kLiterText = ''
+
 
 //======================== lcd
 const LCD = require('raspberrypi-liquid-crystal');
@@ -236,6 +250,9 @@ const rfidInit = () => {
 	    tag = ''
 	    if(gState === 'ready') {
 				task('card-id')
+	    }
+	    else if(gState === 'addTag') {
+	    	task('addCardId')
 	    }
 	    return
 	  } 
@@ -429,6 +446,227 @@ const checkKey = (col) => {
 			}, menuTimeoutCount*1000)
 		break
 
+		case 'addUserID':
+			switch(key) {
+				case '*':  
+					if(userIDAdd.length) userIDAdd = userIDAdd.slice(0, -1); 
+					else return task('maintenance-menu');
+				break;
+				case '#': 
+					if(!userIDAdd.length) return
+					nedb.users.findOne({userID: userIDAdd}, function (err, doc) {
+				    console.log('nedb.users.findOne err, doc =>', err, doc)
+				    if(err) return task('System error');
+				    user = doc
+				    if(!user) {
+							return task('addPassword');
+						}
+
+						lcd.printLineSync(0, 'userID Duplicate');
+						lcd.printLineSync(1, '    Try again   ');
+						clearTimeout(timeoutMenu)
+						timeoutMenu = setTimeout(()=>{
+							task('addUserID')
+						}, alertTimeoutCount*1000)
+				  });
+				break;
+				case '1': case '2': case '3': case '4': case '5': 
+				case '6': case '7': case '8': case '9': case '0': 
+					if(userIDAdd.length >= 8) return
+				 	userIDAdd += key				 	
+				break;
+			}
+
+			lcd.printLineSync(0, 'UserID> '+userIDAdd.padStart(8, ' '));
+			if(!userIDAdd.length) lcd.printLineSync(1, 'BACK(*)    OK(#)');
+			else lcd.printLineSync(1, 'CLEAR(*)   OK(#)');
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, menuTimeoutCount*1000)
+		break
+
+		case 'addPassword':
+			switch(key) {
+				case '*': 
+					if(passwordAdd.length) passwordAdd = passwordAdd.slice(0, -1); 
+					else return task('addUserID'); 
+				break;
+				case '#': 
+					if(!passwordAdd.length) return
+					return task('addPasswordAgain'); 
+				break;
+				case '1': case '2': case '3': case '4': case '5': 
+				case '6': case '7': case '8': case '9': case '0': 
+					if(passwordAdd.length >= 10) return
+					passwordAdd += key
+				break;
+			}
+
+			passwordStart = ''
+			for(let i=0; i<passwordAdd.length; i++) {
+				passwordStart += '*'
+			}
+			lcd.printLineSync(0, 'Pass> '+passwordStart.padStart(10, ' '));
+			if(!passwordAdd.length) lcd.printLineSync(1, 'BACK(*)    OK(#)');
+			else lcd.printLineSync(1, 'CLEAR(*)   OK(#)');
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, menuTimeoutCount*1000)	
+		break 
+
+		case 'addPasswordAgain':
+			switch(key) {
+				case '*': 
+					if(passwordAddAgain.length) passwordAddAgain = passwordAddAgain.slice(0, -1); 
+					else return task('addPassword'); 
+				break;
+				case '#': 
+					if(!passwordAddAgain.length) return
+					if(passwordAdd !== passwordAddAgain) return task('addPasswordNotMatch')
+					return task('addTag')	
+				break;
+				case '1': case '2': case '3': case '4': case '5': 
+				case '6': case '7': case '8': case '9': case '0': 
+					if(passwordAddAgain.length >= 10) return
+					passwordAddAgain += key
+				break;
+			}
+
+			passwordStart = ''
+			for(let i=0; i<passwordAddAgain.length; i++) {
+				passwordStart += '*'
+			}
+			lcd.printLineSync(0, 'Again>'+passwordStart.padStart(10, ' '));
+			if(!passwordAddAgain.length) lcd.printLineSync(1, 'BACK(*)    OK(#)');
+			else lcd.printLineSync(1, 'CLEAR(*)   OK(#)');
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, menuTimeoutCount*1000)	
+		break 
+
+		case 'addTag':
+			switch(key) {
+				case '*': 
+					return task('maintenance-menu'); 
+				break;
+				case '#': 
+					console.log('add =>', userIDAdd, passwordAdd)
+					bcrypt.hash(passwordAdd, 10, function(err, hash) {
+					  if(err) {
+					  	task('System error')
+					    return console.log(err)
+					  }
+					  const data = { 
+					    userID: userIDAdd, 
+					    tag: '',
+					    username: userIDAdd, 
+					    password: hash, 
+					    name: userIDAdd, 
+					    address: '',
+					    lastLogin: '',
+					    role: '',    
+					    createAt: new Date(),
+					    createBy: 'maintenance',
+					    updateAt: new Date(),
+					    updateBy: 'maintenance',
+
+					  }
+					  db.users.insert(data, function (err, newDoc) {
+					    console.log('err, newDoc =>', err, newDoc)
+					    if(err) return task('System error')
+					    task('addComplete') //skip	
+					  });  
+					})
+				break;
+			}
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, menuTimeoutCount*1000)	
+		break
+
+		case 'addPasswordNotMatch':
+			switch(key) {
+				case '*': 
+					return task('addPasswordAgain'); 
+				break;
+				case '#': 
+					task('maintenance-menu') 
+				break;
+			}
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, menuTimeoutCount*1000)	
+		break
+
+		case 'addCardId':
+			switch(key) {
+				case '*': 
+					return task('addTag'); 
+				break;
+				case '#': 
+					console.log('add =>', userIDAdd, passwordAdd, gTag)
+					bcrypt.hash(passwordAdd, 10, function(err, hash) {
+					  if(err) {
+					  	task('System error')
+					    return console.log(err)
+					  }
+					  const data = { 
+					    userID: userIDAdd, 
+					    tag: gTag,
+					    username: userIDAdd, 
+					    password: hash, 
+					    name: userIDAdd, 
+					    address: '',
+					    lastLogin: '',
+					    role: '',    
+					    createAt: new Date(),
+					    createBy: 'maintenance',
+					    updateAt: new Date(),
+					    updateBy: 'maintenance',
+
+					  }
+					  db.users.insert(data, function (err, newDoc) {
+					    console.log('err, newDoc =>', err, newDoc)
+					    if(err) return task('System error')
+					    task('addComplete') //skip	
+					  });  
+					})	
+				break;
+			}
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, menuTimeoutCount*1000)	
+		break
+
+		case 'addComplete':
+			switch(key) {
+				case '*': 
+					return task('maintenance-menu'); 
+				break;
+				case '#': 
+					task('ready')	
+				break;
+			}
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, menuTimeoutCount*1000)	
+		break
+
+
 		case 'password':
 			switch(key) {
 				case '*': 
@@ -445,7 +683,7 @@ const checkKey = (col) => {
 				break;
 			}
 
-			let passwordStart = ''
+			passwordStart = ''
 			for(let i=0; i<password.length; i++) {
 				passwordStart += '*'
 			}
@@ -589,10 +827,11 @@ const checkKey = (col) => {
 						case 'Set flow sensor': return task('Set flow sensor'); break;					
 						case 'Set min price': return task('Set min price'); break;
 						case 'Play sound': return task('Play sound'); break; 
-						case 'Set K dispenser': return task('Set K dispenser'); break;
+						case 'Set K dispenser': return task('Set K dispenser'); break; 
+						case 'Set K Liter': return task('Set K Liter');
 						case 'Set fuel type': return task('Set fuel type'); break;
 						case 'Set date time': return task('Set date time'); break;
-						// case 'Add users': return task('Add users'); break;
+						case 'Add user': return task('addUserID'); break;
 						case 'Ping control M/B': 
 							lcd.printLineSync(0, '    Ping ...    ');
 							lcd.printLineSync(1, '                ');
@@ -861,6 +1100,39 @@ const checkKey = (col) => {
 				break;
 			}
  
+		break 
+
+		case 'Set K Liter': 
+			switch(key) {
+				case '*': 
+					clearInterval(intervalMenu)
+					return task('maintenance-menu'); 
+				break;
+				case '#': 
+					clearInterval(intervalMenu)
+					lcd.printLineSync(0, '  Set K Liter   '); 
+				  lcd.printLineSync(1, '      ...       ');
+				  serialReceiveACK = true
+					serialTransmit('Set K Liter')		
+					clearTimeout(pingTimeout)
+					pingTimeout = setTimeout(()=>{
+						task('Not respond')
+					}, pingTimeoutCount*1000)	
+				break;
+				case '1': case '2': case '3': case '4': case '5': 
+				case '6': case '7': case '8': case '9': case '0': 
+					clearTimeout(timeoutMenu)
+					timeoutMenu = setTimeout(()=>{
+						task('timeout')
+					}, menuTimeoutCount*1000)	
+
+					kLiterText = kLiterText.substring(0, index) + key + kLiterText.substring(index + 1);
+					if(++digiCount>=7) { digiCount=0; index=0; }
+					index=digiCount
+
+				break;
+			}
+ 
 		break
 
 		case 'Set fuel type':
@@ -935,13 +1207,23 @@ const checkKey = (col) => {
 				case '#': 
 					console.log('Reboot')
 					lcd.printLineSync(0, '   Reboot now   ');
-					lcd.printLineSync(1, '       ...      ');
-					timeoutMenu = setTimeout(()=>{
-						var exec = require('child_process').exec;
-						exec('sudo reboot', function(error, stdout, stderr){ 
-							console.log('Reboot:',error, stdout, stderr)
-						});
-					}, 1*1000)	
+					lcd.printLineSync(1, '      ...       ');
+
+					alert = {
+				    insertAt: new Date(),
+				    event: 'Reboot',
+				    message: 'Reboot by Maintenance'
+				  }
+				  // console.log(alert)
+				  nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
+				    console.log(err, newDoc)
+				    setTimeout(()=>{
+				      var exec = require('child_process').exec;
+				      exec('sudo reboot', function(error, stdout, stderr){ 
+				        console.log('Reboot:',error, stdout, stderr)
+				      });
+				    }, 1*1000)  
+				  });
 				break;
 			}			
 		break;
@@ -1230,6 +1512,11 @@ const serialTransmit = (command) => {
 		case 'Set K dispenser': 
 			gStateLast = gState
 			cmdNow = cmd.start + cmdFuelType + cmd.set_value_of_K_of_dispenser + kDispenserText + cmd.end	
+		break 
+
+		case 'Set K Liter': 
+			gStateLast = gState
+			cmdNow = cmd.start + cmdFuelType + cmd.set_value_of_K_of_Liter_range + kLiterText + cmd.end	
 		break
 
 		case 'Set fuel type':
@@ -1320,7 +1607,7 @@ const serialReceive = (buf) => {
 					});
 
 					// update setting
-					db.setting.update({ key: 'price' }, { $set: {value: price} }, { upsert: true }, function (err, numReplaced) {
+					nedb.setting.update({ key: 'price' }, { $set: {value: price} }, { upsert: true }, function (err, numReplaced) {
 					  console.log(err, numReplaced)
 					});
 			
@@ -1341,7 +1628,7 @@ const serialReceive = (buf) => {
 					});
 
 					// update setting
-					db.setting.update({ key: 'flowSensor' }, { $set: {value: flowSensor} }, { upsert: true }, function (err, numReplaced) {
+					nedb.setting.update({ key: 'flowSensor' }, { $set: {value: flowSensor} }, { upsert: true }, function (err, numReplaced) {
 					  console.log(err, numReplaced)
 					});
 			
@@ -1394,7 +1681,7 @@ const serialReceive = (buf) => {
 					});
 
 					// update setting
-					db.setting.update({ key: 'fullTank' }, { $set: {value: fullTank} }, { upsert: true }, function (err, numReplaced) {
+					nedb.setting.update({ key: 'fullTank' }, { $set: {value: fullTank} }, { upsert: true }, function (err, numReplaced) {
 					  console.log(err, numReplaced)
 					});
 			
@@ -1415,7 +1702,7 @@ const serialReceive = (buf) => {
 					});
 
 					// update setting
-					db.setting.update({ key: 'minPrice' }, { $set: {value: minPrice} }, { upsert: true }, function (err, numReplaced) {
+					nedb.setting.update({ key: 'minPrice' }, { $set: {value: minPrice} }, { upsert: true }, function (err, numReplaced) {
 					  console.log(err, numReplaced)
 					});
 			
@@ -1436,7 +1723,7 @@ const serialReceive = (buf) => {
 					});
 
 					// update setting
-					db.setting.update({ key: 'playSound' }, { $set: {value: playSound} }, { upsert: true }, function (err, numReplaced) {
+					nedb.setting.update({ key: 'playSound' }, { $set: {value: playSound} }, { upsert: true }, function (err, numReplaced) {
 					  console.log(err, numReplaced)
 					});
 			
@@ -1457,7 +1744,28 @@ const serialReceive = (buf) => {
 					});
 
 					// update setting
-					db.setting.update({ key: 'kDispenser' }, { $set: {value: kDispenser} }, { upsert: true }, function (err, numReplaced) {
+					nedb.setting.update({ key: 'kDispenser' }, { $set: {value: kDispenser} }, { upsert: true }, function (err, numReplaced) {
+					  console.log(err, numReplaced)
+					});
+			
+					task('Setting is ok')
+				break 
+
+				case 'Set K Liter': 
+					console.log('serialReceive',gState, ackBuf, kLiterText)	
+					kLiter = kLiterText
+					alert = {
+						insertAt: new Date(),
+						event: 'Set Set K Liter',
+						message: 'OK K Liter='+kLiter
+					}
+					// console.log(alert)
+					nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
+					  console.log(err, newDoc)
+					});
+
+					// update setting
+					nedb.setting.update({ key: 'kLiter' }, { $set: {value: kLiter} }, { upsert: true }, function (err, numReplaced) {
 					  console.log(err, numReplaced)
 					});
 			
@@ -1515,6 +1823,7 @@ const serialReceive = (buf) => {
 				case 'Set min price': 
 				case 'Play sound':
 				case 'Set K dispenser':
+				case 'Set K Liter':
 				case 'Set fuel type':		
 				case 'Clear amount':				
 					task('Error respond')
@@ -1866,7 +2175,116 @@ const task = state => {
 			timeoutMenu = setTimeout(()=>{
 				task('timeout')
 			}, menuTimeoutCount*1000)	
+		break; 
+
+
+		// add user ============================================
+		case 'addUserID':
+		 	userIDAdd = ''
+		 	passwordAdd = ''
+		 	passwordAddAgain = ''
+		 	gTag = ''
+
+		  clearInterval(intervalMenu)
+
+			// console.log(users, user, tag)			
+			lcd.printLineSync(0, 'UserID> '+userID.padStart(8, ' '));
+			lcd.printLineSync(1, 'BACK(*)    OK(#)');
+			
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, menuTimeoutCount*1000)	
 		break;
+
+		case 'addPassword':
+		 	passwordAdd = ''
+		 	passwordAddAgain = ''
+		 	gTag = ''
+
+		  clearInterval(intervalMenu)
+
+			// console.log(users, user, tag)			
+			lcd.printLineSync(0, 'Pass> '+userID.padStart(10, ' '));
+			lcd.printLineSync(1, 'BACK(*)    OK(#)');
+			
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, menuTimeoutCount*1000)	
+		break;
+
+		case 'addPasswordAgain':
+		 	passwordAddAgain = ''
+		 	gTag = ''
+
+		  clearInterval(intervalMenu)
+
+			// console.log(users, user, tag)			
+			lcd.printLineSync(0, 'Again>'+userID.padStart(10, ' '));
+			lcd.printLineSync(1, 'BACK(*)    OK(#)');
+			
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, menuTimeoutCount*1000)	
+		break; 
+
+		case 'addTag':
+		 	gTag = ''
+
+		  clearInterval(intervalMenu)
+
+			// console.log(users, user, tag)			
+			lcd.printLineSync(0, ' Tap RFID card  ');
+			lcd.printLineSync(1, 'MENU(*)  SKIP(#)');
+			
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, menuTimeoutCount*1000)	
+		break;
+
+		case 'addPasswordNotMatch':
+		  clearInterval(intervalMenu)
+		
+			lcd.printLineSync(0, ' Pass not match ');
+			lcd.printLineSync(1, 'BACK(*)  MENU(#)');
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, menuTimeoutCount*1000)	
+		break; 
+
+		case 'addCardId':
+		  clearInterval(intervalMenu)
+
+			// console.log(users, user, tag)			
+			lcd.printLineSync(0, 'Tag> '+gTag.padStart(11, ' '));
+			lcd.printLineSync(1, 'BACK(*)   ADD(#)');
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, menuTimeoutCount*1000)	
+		break;
+
+		case 'addComplete':
+		  clearInterval(intervalMenu)
+
+			// console.log(users, user, tag)			
+			lcd.printLineSync(0, '  Add user OK   ');
+			lcd.printLineSync(1, 'MENU(*)  HOME(#)');
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, menuTimeoutCount*1000)	
+		break;
+
+		// add user end ============================================
+
 
 		case 'user-not-found':
 			{
@@ -1921,8 +2339,11 @@ const task = state => {
 		  clearInterval(intervalMenu)
 
 			if(maintenanceMode) {
-				user =  users.find((u) => (u.maintenance===true) && (u.password===password) )	
-	    	if(!user) { 
+				// console.log('password =>', password)
+				nedb.setting.findOne({key: 'mainPassword', value: password}, function (err, doc) {
+			    console.log('err, doc =>', err, doc)
+			    user = doc
+			    if(!user) { 
 	    		{
 		    		let msg = ''
 		    		msg='maintenanceMode'
@@ -1947,6 +2368,7 @@ const task = state => {
 					return			
 				}
 				return task('maintenance-menu')
+			  });
 			}
 			else {
 				console.log('======= user', user)
@@ -1981,40 +2403,6 @@ const task = state => {
 		    }); 
 			}
 
-
-		 //  let user = null
-			// if(gTag) user =  users.find((u) => (u.tag===gTag) && (u.password===password) )
-			// else if(userID) user =  users.find((u) => (u.userID===userID) && (u.password===password) )
-			// else if(maintenanceMode) user =  users.find((u) => (u.maintenance===true) && (u.password===password) )
-				
-   //  	if(!user) { 
-   //  		{
-	  //   		let msg = ''
-	  //   		if(gTag) msg='tag:'+gTag
-			// 		else if(userID) msg='userID:'+userID
-			// 		else if(maintenanceMode) msg='maintenanceMode'
-	  //   		alert = {
-			// 			insertAt: new Date(),
-			// 			event: 'Check Password',
-			// 			message: 'Password incorrect '+ msg
-			// 		}
-			// 		// console.log(alert)
-			// 		nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
-			// 		  console.log(err, newDoc)
-			// 		});
-			// 	}
-
-			// 	lcd.printLineSync(0, '   Password     ');
-			// 	lcd.printLineSync(1, '  incorrect!    ');
-
-			// 	clearTimeout(timeoutMenu)
-			// 	setTimeout(()=>{
-			// 		task('ready')
-			// 	}, 2*1000)	
-			// 	return			
-			// }
-			// if(maintenanceMode) return task('maintenance-menu')
-			// task('validation-to')
 		break; 
 
 		case 'validation-to':
@@ -2525,6 +2913,36 @@ const task = state => {
 					blink = true
 				}
 				lcd.printLineSync(0, 'K dispenser> '+lcdShow.padStart(2, ' ') + '             ');
+				lcd.printLineSync(1, 'BACK(*)    OK(#)');	
+			}, 500)
+		break; 
+
+		case 'Set K Liter':  
+			kLiterText = kLiter
+			// console.log('========kLiter',kLiter)
+			digiCount=0; index=0
+			clearInterval(intervalMenu)
+			
+			lcd.printLineSync(0, 'K Liter> '+kLiterText.padStart(7, ' ') + '     ');
+			lcd.printLineSync(1, 'BACK(*)    OK(#)');
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, menuTimeoutCount*1000)	
+
+			clearInterval(intervalMenu)
+			intervalMenu = setInterval (()=>{
+				let lcdShow = ''			
+				if(blink) {
+					lcdShow = kLiterText.substring(0, index) + '_' + kLiterText.substring(index + 1)
+					blink = false
+				}
+				else {
+					lcdShow = kLiterText
+					blink = true
+				}
+				lcd.printLineSync(0, 'K Liter> '+lcdShow.padStart(7, ' ') + '     ');
 				lcd.printLineSync(1, 'BACK(*)    OK(#)');	
 			}, 500)
 		break;

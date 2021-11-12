@@ -24,7 +24,9 @@
           <div class="row">
 
             <div class="col-xl-3 col-sm-6 col-12 my-2"> 
-              <div class="card" onClick="window.location='/orders';">
+              <div class="card" 
+                <% if(user.username=='root' || user.userID=='owner' || user.role=='admin') { %> onClick="window.location='/orders';" <% } %> 
+              >
                 <div class="card-content">
                   <div class="card-body">
                     <div class="media d-flex">
@@ -32,7 +34,7 @@
                         <i class="fa fa-check"></i>
                       </div>
                       <div class="media-body text-right">
-                        <h3 id="ordersCount">---</h3>
+                        <h3><%= data.orders %></h3>
                         <span>To day Orders </span>
                       </div>
                     </div>
@@ -42,7 +44,9 @@
             </div>
 
             <div class="col-xl-3 col-sm-6 col-12 my-2"> 
-              <div class="card" onClick="window.location='/orders';">
+              <div class="card" 
+                <% if(user.username=='root' || user.userID=='owner' || user.role=='admin') { %> onClick="window.location='/orders';" <% } %> 
+              >
                 <div class="card-content">
                   <div class="card-body">
                     <div class="media d-flex">
@@ -50,7 +54,7 @@
                         <i class="fa fa-dollar"></i>
                       </div>
                       <div class="media-body text-right">
-                        <h3 id="ordersCount">---</h3>
+                        <h3><%= data.amounts %></h3>
                         <span>To day Income </span>
                       </div>
                     </div>
@@ -60,7 +64,9 @@
             </div>
 
             <div class="col-xl-3 col-sm-6 col-12 my-2"> 
-              <div class="card">
+              <div class="card" 
+                <% if(user.username=='root' || user.userID=='owner' || user.role=='admin') { %> onClick="window.location='/users';" <% } %> 
+              >
                 <div class="card-content">
                   <div class="card-body">
                     <div class="media d-flex">
@@ -68,8 +74,8 @@
                         <i class="fa fa-user-circle"></i>
                       </div>
                       <div class="media-body text-right">
-                        <h3 id="ordersCount">---</h3>
-                        <span>Attending staff</span>
+                        <h3><%= data.users %></h3>
+                        <span>All users</span>
                       </div>
                     </div>
                   </div>
@@ -78,7 +84,9 @@
             </div>
 
             <div class="col-xl-3 col-sm-6 col-12 my-2"> 
-              <div class="card" onClick="window.location='/alerts';">
+              <div class="card" 
+                <% if(user.username=='root' || user.userID=='owner' || user.role=='admin') { %> onClick="window.location='/alerts';" <% } %> 
+              >
                 <div class="card-content">
                   <div class="card-body">
                     <div class="media d-flex">
@@ -86,7 +94,7 @@
                         <i class="fa fa-bell"></i>
                       </div>
                       <div class="media-body text-right">
-                        <h3 id="ordersCount">---</h3>
+                        <h3><%= data.alerts %></h3>
                         <span>To day Alerts</span>
                       </div>
                     </div>
