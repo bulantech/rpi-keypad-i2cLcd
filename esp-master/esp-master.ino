@@ -1,38 +1,11 @@
-/*
-   Copyright (c) 2015, Majenko Technologies
-   All rights reserved.
-
-   Redistribution and use in source and binary forms, with or without modification,
-   are permitted provided that the following conditions are met:
-
- * * Redistributions of source code must retain the above copyright notice, this
-     list of conditions and the following disclaimer.
-
- * * Redistributions in binary form must reproduce the above copyright notice, this
-     list of conditions and the following disclaimer in the documentation and/or
-     other materials provided with the distribution.
-
- * * Neither the name of Majenko Technologies nor the names of its
-     contributors may be used to endorse or promote products derived from
-     this software without specific prior written permission.
-
-   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-   ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-   WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-   DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
-   ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-   (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-   LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-   ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
 
 /* Create a WiFi access point and provide a web server on it. */
 
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
+#include <SimpleCLI.h>
+
 
 //#ifndef APSSID
 #define APSSID "ap0242ac130003"
@@ -55,6 +28,53 @@ String argValue = "";
 int ledState = LOW;
 unsigned long previousMillis = 0;
 const long interval = 1000;
+const long intervalOn = 200;
+
+// Create CLI Object
+SimpleCLI cli;
+
+// Commands
+Command whoAreYou;
+Command clientId;
+
+// Callback function for cowsay command
+void whoAreYouCallback(cmd* c) {
+  Command cmd(c); // Create wrapper object
+  // Get first (and only) Argument
+  Argument arg = cmd.getArgument(0);
+  // Get value of argument
+  String argVal = arg.getValue();    
+//    for (int i = 0; i<argVal.length(); i++) Serial.print('_');
+  // Print Value
+  Serial.println("~esp-master");
+}
+
+void clientIdCallback(cmd* c) {
+  Command cmd(c); // Create wrapper object
+  // Get first (and only) Argument
+  Argument arg = cmd.getArgument(0);
+  // Get value of argument
+  String argVal = arg.getValue();    
+//    for (int i = 0; i<argVal.length(); i++) Serial.print('_');
+  // Print Value
+  Serial.println("~"+argValue);
+}
+
+// Callback in case of an error
+void errorCallback(cmd_error* e) {
+    CommandError cmdError(e); // Create wrapper object
+
+    Serial.print("ERROR: ");
+    Serial.println(cmdError.toString());
+
+//    if (cmdError.hasCommand()) {
+//        Serial.print("Did you mean \"");
+//        Serial.print(cmdError.getCommand().toString());
+//        Serial.println("\"?");
+//    }
+}
+
+
 
 /* Just a little test message.  Go to http://192.168.4.1 in a web browser
    connected to this access point to see it.
@@ -72,8 +92,8 @@ void registerDevice() {
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   
-  delay(1000);
-  Serial.begin(115200);
+//  delay(1000);
+  Serial.begin(9600);
   Serial.println();
   Serial.println("Configuring access point...");
 
@@ -91,45 +111,50 @@ void setup() {
   server.begin();
   Serial.println("HTTP server started");
 
-  
+  cli.setOnError(errorCallback); // Set error Callback
+  whoAreYou = cli.addSingleArgCmd("~?", whoAreYouCallback);
+  clientId = cli.addSingleArgCmd("~cid", clientIdCallback);
 }
 
-String inData = "";
 void checkCommand() {
-  while (Serial.available() > 0)
-  {
-    char recieved = Serial.read();
-    inData += recieved; 
+  // Check if user typed something into the serial monitor
+  if (Serial.available()) {
+    // Read out string from the serial monitor
+    String input = Serial.readStringUntil('\n');
 
-    if (recieved == ':')
-    {
-      inData = ":"; // Clear recieved buffer
-    }
-    
-    // Process message when new line character is recieved
-    if (recieved == ';')
-    {
-      if (inData.indexOf(':') != 0) {
-        Serial.println("inData[0] != :");
-        return;
-      }
-      
-      Serial.print("Arduino Received: ");
-      Serial.println(inData);
+    // Parse the user input into the CLI
+    cli.parse(input);
 
-      if(inData == ":ack;") Serial.println(":ok;");
-      else if(inData == ":check;") { Serial.println(":"+argValue+";"); argValue=""; }
-      
-      inData = ""; // Clear recieved buffer
-    }
+    ledState = HIGH;
+    digitalWrite(LED_BUILTIN, LOW);
   }
+
+  if (cli.errored()) {
+    CommandError cmdError = cli.getError();
+
+    Serial.print("ERROR: ");
+    Serial.println(cmdError.toString());
+
+//    if (cmdError.hasCommand()) {
+//      Serial.print("Did you mean \"");
+//      Serial.print(cmdError.getCommand().toString());
+//      Serial.println("\"?");
+//    }
+  }
+    
 }
 
 void loop() {
   server.handleClient();
 
   unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis >= interval) {
+  if (ledState == LOW) { //on
+    if (currentMillis - previousMillis >= intervalOn) {
+      ledState = HIGH; //off
+      digitalWrite(LED_BUILTIN, ledState);
+    }
+  }
+  else if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
     if (ledState == LOW) {
       ledState = HIGH;  // Note that this switches the LED *off*
