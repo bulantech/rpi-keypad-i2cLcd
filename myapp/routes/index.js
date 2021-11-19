@@ -145,7 +145,7 @@ router.get('/setting', function(req, res, next) {
   }
 
   nedb.setting.find({}, function (err, docs) {
-    console.log('err, docs =>', err, docs)
+    if(err) console.log('/setting err, docs =>', err, docs)
     const data = docs
     res.render('setting', { user: req.user, gTitle: gTitle, title: gTitle + ' - Setting', navLink: 'setting', data: data });
   });
@@ -159,13 +159,13 @@ router.post('/setting/edit', function(req, res, next) {
   }
 
   if(!req.body.key) {   
-    console.log('Key not found !!')
+    console.log('/setting/edit Key not found !!')
     res.send({error: 1, msg: 'Key not found !!'});
     return
   }  
 
   if(!req.body.value) {   
-    console.log('Value not found !!')
+    console.log('/setting/edit Value not found !!')
     res.send({error: 2, msg: 'Value not found !!'});
     return
   } 
@@ -175,7 +175,7 @@ router.post('/setting/edit', function(req, res, next) {
 
   nedb.setting.update({key: req.body.key}, { $set: req.body }, function (err, newDoc) {
     if(err) {
-      console.log(err, doc)
+      console.log('/setting/edit', err, doc)
       res.send({error: 3, msg: 'db update error!!'});
       return
     }

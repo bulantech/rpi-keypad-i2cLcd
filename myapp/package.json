@@ -1,15 +1,14 @@
 {
-  "name": "myapp",
+  "name": "oil-vm",
   "version": "0.0.0",
   "private": true,
   "bin": "./bin/www",
   "pkg": {
     "assets": [
-      "views/**/*",
-      "public/**/*"
+      "./views/**/*"
     ],
     "targets": [
-      "node14-linux-armv7"
+      "node14-linux"
     ]
   },
   "scripts": {
@@ -27,6 +26,7 @@
     "input-event": "^1.2.6",
     "morgan": "^1.10.0",
     "nedb": "^1.8.0",
+    "nodemon": "^2.0.15",
     "onoff": "^6.0.3",
     "passport": "^0.5.0",
     "passport-jwt": "^4.0.0",

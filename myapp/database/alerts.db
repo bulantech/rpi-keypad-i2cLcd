@@ -53,6 +53,7 @@
 {"insertAt":{"$$date":1636483076713},"event":"info","message":"App restart","_id":"FiJAxisy5xqS8NFO"}
 {"insertAt":{"$$date":1636558680106},"event":"Check RFID","message":"RFID Not Found","_id":"FkVJ3Y5CEm99Te5p"}
 {"insertAt":{"$$date":1636731208695},"event":"Check RFID","message":"RFID Not Found","_id":"FkZccVaywPjRHzFT"}
+{"insertAt":{"$$date":1636738107892},"event":"info","message":"App restart","_id":"GC5JXisNaKjQ8wJc"}
 {"insertAt":{"$$date":1636735458671},"event":"info","message":"App restart","_id":"H4epGvj0vpZht2MG"}
 {"insertAt":{"$$date":1636479896243},"event":"info","message":"App restart","_id":"HD7PERdpKSIBxry8"}
 {"insertAt":{"$$date":1636726277430},"event":"info","message":"App restart","_id":"HqrbpvVNbpM25PQX"}
@@ -190,4 +191,3 @@
 {"insertAt":{"$$date":1636733302202},"event":"Check RFID","message":"RFID Not Found","_id":"ywUALFBVpOwmfc0C"}
 {"insertAt":{"$$date":1636726326888},"event":"Check RFID","message":"RFID Not Found","_id":"zG4tImgy4Pdf6z49"}
 {"insertAt":{"$$date":1636732608898},"event":"info","message":"App restart","_id":"zULCJBztNBjgqfFn"}
-{"insertAt":{"$$date":1636738107892},"event":"info","message":"App restart","_id":"GC5JXisNaKjQ8wJc"}

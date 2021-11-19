@@ -30,7 +30,7 @@
 
 	"timeoutCount": {
 		"menu":30,
-		"fill":15,
+		"fill":300,
 		"alert":3,
 		"skip":10,
 		"ping":5,

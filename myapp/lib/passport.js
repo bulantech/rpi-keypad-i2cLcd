@@ -7,7 +7,7 @@ const bcrypt = require('bcrypt');
 
 const path = require('path');
 const cwd = process.cwd()
-const nedb = require(path.join(cwd, 'lib', 'nedb') )
+const nedb = require('./nedb') //require(path.join(cwd, 'lib', 'nedb') )
 const config = require('config');
 
 const jwtOptions = {

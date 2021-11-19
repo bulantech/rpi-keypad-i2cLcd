@@ -2,7 +2,7 @@ const config = require('config');
 const player = require('play-sound')(opts = {})
 const path = require('path');
 const cwd = process.cwd()
-const nedb = require(path.join(cwd, 'lib', 'nedb') )
+const nedb = require('./lib/nedb') //require(path.join(cwd, 'lib', 'nedb') )
 const bcrypt = require('bcrypt');
 
 // nedb.setting.find({}, function (err, docs) {
@@ -22,12 +22,16 @@ let userIDAdd = ''
 let passwordAdd = ''
 let passwordAddAgain = ''
 
+let passwordChange = ''
+let passwordChangeAgain = ''
+
 let intervalMenu
 let timeoutMenu
 let pingTimeout
 
 const menuTimeoutCount = config.get('timeoutCount.menu');
 const fillTimeoutCount = config.get('timeoutCount.fill');
+let fillTimeoutNow = fillTimeoutCount
 const alertTimeoutCount = config.get('timeoutCount.alert');
 const skipTimeoutCount = config.get('timeoutCount.skip');
 const pingTimeoutCount = config.get('timeoutCount.ping');
@@ -64,9 +68,6 @@ let alert = {}
 // length 1 					1 		2 					v 							1
 // 				: 					D/G 	01-FF 			Check requires 	;
 
-let cmdFuelType = config.get('mbType') // D or G
-let cmdFuelTypeBuf = ''
-
 const cmd = {	
 	start: 	':',
 	end: 		';',
@@ -101,7 +102,8 @@ const maintenanceMenu = [
 	'Set K Liter', //'0D', // LLLKKKK
 	'Ping control M/B', //0E
 	// 'Clear/reset',
-	'Add user',	
+	'Add user',
+	'Change password',	
 	'Reboot',
 	'Exit, to Home',
 ]
@@ -207,13 +209,22 @@ nedb.setting.findOne({key: 'kLiter'}, function (err, doc) {
 })
 let kLiterText = ''
 
+let cmdFuelType = 'G' //config.get('mbType') // D or G
+nedb.setting.findOne({key: 'fuelType'}, function (err, doc) {
+	// console.log(err, doc)
+	if(err) return console.log(err)
+	if(!doc) return console.log('findOne fuelType doc=>', doc)
+	cmdFuelType = doc.value
+})
+let cmdFuelTypeBuf = ''
 
-//======================== lcd
+
+//======================== lcd ======================================================
 const LCD = require('raspberrypi-liquid-crystal');
 // Instantiate the LCD object on bus 1 address 3f with 16 chars width and 2 lines
 const lcd = new LCD(1, 0x27, 16, 2);
 
-//======================== rfid
+//======================== rfid ======================================================
 const rfidInit = () => {
 	const fs = require("fs");
 	const path = '/dev/input/event0'
@@ -257,12 +268,12 @@ const rfidInit = () => {
 	    return
 	  } 
 	  const keyCode = event_codes.find(({code}) => code === ev.code )
-	  // console.log(ev.code, keyCode.key)
+	  console.log(ev.code, keyCode.key)
 	  tag += keyCode.key
 	});
 }
 
-//======================== keypad
+//======================== keypad ======================================================
 //Pi GPIO6  to keypad R1
 //Pi GPIO13 to keypad R2
 //Pi GPIO19 to keypad R3
@@ -391,6 +402,7 @@ const checkKey = (col) => {
 				    if(user) { 
 							transaction.insertAt = new Date()
 							transaction.tag = gTag
+							transaction.name = user.name
 							return task('password'); 
 						}
 						task('user-not-found');
@@ -425,6 +437,7 @@ const checkKey = (col) => {
 				    if(user) {
 							transaction.insertAt = new Date()
 							transaction.userID = userID
+							transaction.name = user.name
 							return task('password');
 						}
 						task('user-not-found');
@@ -550,6 +563,69 @@ const checkKey = (col) => {
 			}, menuTimeoutCount*1000)	
 		break 
 
+		case 'changePassword':
+			switch(key) {
+				case '*': 
+					if(passwordChange.length) passwordChange = passwordChange.slice(0, -1); 
+					else return task('maintenance-menu'); 
+				break;
+				case '#': 
+					if(!passwordChange.length) return
+					return task('changePasswordAgain'); 
+				break;
+				case '1': case '2': case '3': case '4': case '5': 
+				case '6': case '7': case '8': case '9': case '0': 
+					if(passwordChange.length >= 10) return
+					passwordChange += key
+				break;
+			}
+
+			passwordStart = ''
+			for(let i=0; i<passwordChange.length; i++) {
+				passwordStart += '*'
+			}
+			lcd.printLineSync(0, 'Pass> '+passwordStart.padStart(10, ' '));
+			if(!passwordChange.length) lcd.printLineSync(1, 'BACK(*)    OK(#)');
+			else lcd.printLineSync(1, 'CLEAR(*)   OK(#)');
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, menuTimeoutCount*1000)	
+		break 
+
+		case 'changePasswordAgain':
+			switch(key) {
+				case '*': 
+					if(passwordChangeAgain.length) passwordChangeAgain = passwordChangeAgain.slice(0, -1); 
+					else return task('changePassword'); 
+				break;
+				case '#': 
+					if(!passwordChangeAgain.length) return
+					if(passwordChange!== passwordChangeAgain) return task('changePasswordNotMatch')
+					return task('changePasswordComplete')
+				break;
+				case '1': case '2': case '3': case '4': case '5': 
+				case '6': case '7': case '8': case '9': case '0': 
+					if(passwordChangeAgain.length >= 10) return
+					passwordChangeAgain += key
+				break;
+			}
+
+			passwordStart = ''
+			for(let i=0; i<passwordChangeAgain.length; i++) {
+				passwordStart += '*'
+			}
+			lcd.printLineSync(0, 'Again>'+passwordStart.padStart(10, ' '));
+			if(!passwordChangeAgain.length) lcd.printLineSync(1, 'BACK(*)    OK(#)');
+			else lcd.printLineSync(1, 'CLEAR(*)   OK(#)');
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, menuTimeoutCount*1000)	
+		break 
+
 		case 'addTag':
 			switch(key) {
 				case '*': 
@@ -596,6 +672,22 @@ const checkKey = (col) => {
 			switch(key) {
 				case '*': 
 					return task('addPasswordAgain'); 
+				break;
+				case '#': 
+					task('maintenance-menu') 
+				break;
+			}
+
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, menuTimeoutCount*1000)	
+		break
+
+		case 'changePasswordNotMatch':
+			switch(key) {
+				case '*': 
+					return task('changePasswordAgain'); 
 				break;
 				case '#': 
 					task('maintenance-menu') 
@@ -714,7 +806,7 @@ const checkKey = (col) => {
 
 		case 'fill-full-confirm':
 			switch(key) {
-				case '*': return task('fill-select'); break;
+				case '*': return task('ready'); break; //return task('fill-select'); break;
 				case '#': return task('fill-full-ack'); break;				
 			}
 		break
@@ -747,7 +839,7 @@ const checkKey = (col) => {
 
 		case 'fill-bath-confirm':
 			switch(key) {
-				case '*': return task('fill-select'); break;
+				case '*': return task('ready'); break; //return task('fill-select'); break;
 				case '#': return task('fill-bath-ack'); break;
 			}
 		break
@@ -780,7 +872,7 @@ const checkKey = (col) => {
 
 		case 'fill-litres-confirm':
 			switch(key) {
-				case '*': return task('fill-select'); break;
+				case '*': return task('ready'); break; //return task('fill-select'); break;
 				case '#': return task('fill-litres-ack'); break;
 			}
 		break
@@ -831,7 +923,8 @@ const checkKey = (col) => {
 						case 'Set K Liter': return task('Set K Liter');
 						case 'Set fuel type': return task('Set fuel type'); break;
 						case 'Set date time': return task('Set date time'); break;
-						case 'Add user': return task('addUserID'); break;
+						case 'Add user': return task('addUserID'); break; 
+						case 'Change password': return task('changePassword');
 						case 'Ping control M/B': 
 							lcd.printLineSync(0, '    Ping ...    ');
 							lcd.printLineSync(1, '                ');
@@ -1174,7 +1267,11 @@ const checkKey = (col) => {
 
 		case 'Setting is ok':
 			switch(key) {
-				case '*': return task(gStateLast); break;
+				case '*': 
+					if(gStateLast == 'Set fuel type') {
+						menuCount = maintenanceMenu.indexOf('Set fuel type');
+						return task('maintenance-menu');
+					}
 				case '#': 
 					if(gStateLast==='Set fuel price') {
 						console.log('Controller must reset')
@@ -1195,7 +1292,13 @@ const checkKey = (col) => {
 
 		case 'Error respond':
 			switch(key) {
-				case '*': return task(gStateLast); break;
+				case '*': 
+					if(gStateLast == 'Ping control M/B') {
+						menuCount = maintenanceMenu.indexOf('Ping control M/B');
+						return task('maintenance-menu');
+					} 
+					return task(gStateLast); 
+				break;
 				case '#': menuCount=0; return task('maintenance-menu'); break;
 				break;
 			}		
@@ -1607,7 +1710,7 @@ const serialReceive = (buf) => {
 					});
 
 					// update setting
-					nedb.setting.update({ key: 'price' }, { $set: {value: price} }, { upsert: true }, function (err, numReplaced) {
+					nedb.setting.update({ key: 'price' }, { $set: {value: price, updateBy: 'maintenance'} }, { upsert: true }, function (err, numReplaced) {
 					  console.log(err, numReplaced)
 					});
 			
@@ -1628,7 +1731,7 @@ const serialReceive = (buf) => {
 					});
 
 					// update setting
-					nedb.setting.update({ key: 'flowSensor' }, { $set: {value: flowSensor} }, { upsert: true }, function (err, numReplaced) {
+					nedb.setting.update({ key: 'flowSensor' }, { $set: {value: flowSensor, updateBy: 'maintenance'} }, { upsert: true }, function (err, numReplaced) {
 					  console.log(err, numReplaced)
 					});
 			
@@ -1681,7 +1784,7 @@ const serialReceive = (buf) => {
 					});
 
 					// update setting
-					nedb.setting.update({ key: 'fullTank' }, { $set: {value: fullTank} }, { upsert: true }, function (err, numReplaced) {
+					nedb.setting.update({ key: 'fullTank' }, { $set: {value: fullTank, updateBy: 'maintenance'} }, { upsert: true }, function (err, numReplaced) {
 					  console.log(err, numReplaced)
 					});
 			
@@ -1702,7 +1805,7 @@ const serialReceive = (buf) => {
 					});
 
 					// update setting
-					nedb.setting.update({ key: 'minPrice' }, { $set: {value: minPrice} }, { upsert: true }, function (err, numReplaced) {
+					nedb.setting.update({ key: 'minPrice' }, { $set: {value: minPrice, updateBy: 'maintenance'} }, { upsert: true }, function (err, numReplaced) {
 					  console.log(err, numReplaced)
 					});
 			
@@ -1723,7 +1826,7 @@ const serialReceive = (buf) => {
 					});
 
 					// update setting
-					nedb.setting.update({ key: 'playSound' }, { $set: {value: playSound} }, { upsert: true }, function (err, numReplaced) {
+					nedb.setting.update({ key: 'playSound' }, { $set: {value: playSound, updateBy: 'maintenance'} }, { upsert: true }, function (err, numReplaced) {
 					  console.log(err, numReplaced)
 					});
 			
@@ -1744,7 +1847,7 @@ const serialReceive = (buf) => {
 					});
 
 					// update setting
-					nedb.setting.update({ key: 'kDispenser' }, { $set: {value: kDispenser} }, { upsert: true }, function (err, numReplaced) {
+					nedb.setting.update({ key: 'kDispenser' }, { $set: {value: kDispenser, updateBy: 'maintenance'} }, { upsert: true }, function (err, numReplaced) {
 					  console.log(err, numReplaced)
 					});
 			
@@ -1765,7 +1868,7 @@ const serialReceive = (buf) => {
 					});
 
 					// update setting
-					nedb.setting.update({ key: 'kLiter' }, { $set: {value: kLiter} }, { upsert: true }, function (err, numReplaced) {
+					nedb.setting.update({ key: 'kLiter' }, { $set: {value: kLiter, updateBy: 'maintenance'} }, { upsert: true }, function (err, numReplaced) {
 					  console.log(err, numReplaced)
 					});
 			
@@ -1783,6 +1886,10 @@ const serialReceive = (buf) => {
 					// console.log(alert)
 					nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
 					  console.log(err, newDoc)
+					});
+					// update setting
+					nedb.setting.update({ key: 'fuelType' }, { $set: {value: cmdFuelType, updateBy: 'maintenance'} }, { upsert: true }, function (err, numReplaced) {
+					  console.log(err, numReplaced)
 					});
 			
 					task('Setting is ok')
@@ -2230,6 +2337,39 @@ const task = state => {
 			}, menuTimeoutCount*1000)	
 		break; 
 
+
+		case 'changePassword':
+		 	passwordChange = ''
+		 	passwordChangeAgain = ''
+
+		  clearInterval(intervalMenu)
+
+			// console.log(users, user, tag)			
+			lcd.printLineSync(0, 'Pass> '+passwordChange.padStart(10, ' '));
+			lcd.printLineSync(1, 'BACK(*)    OK(#)');
+			
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, menuTimeoutCount*1000)	
+		break;
+
+		case 'changePasswordAgain':
+		 	passwordChangeAgain = ''
+
+		  clearInterval(intervalMenu)
+
+			// console.log(users, user, tag)			
+			lcd.printLineSync(0, 'Again>'+passwordChangeAgain.padStart(10, ' '));
+			lcd.printLineSync(1, 'BACK(*)    OK(#)');
+			
+			clearTimeout(timeoutMenu)
+			timeoutMenu = setTimeout(()=>{
+				task('timeout')
+			}, menuTimeoutCount*1000)	
+		break; 
+
+
 		case 'addTag':
 		 	gTag = ''
 
@@ -2246,6 +2386,7 @@ const task = state => {
 		break;
 
 		case 'addPasswordNotMatch':
+		case 'changePasswordNotMatch':
 		  clearInterval(intervalMenu)
 		
 			lcd.printLineSync(0, ' Pass not match ');
@@ -2256,6 +2397,35 @@ const task = state => {
 				task('timeout')
 			}, menuTimeoutCount*1000)	
 		break; 
+
+		case 'changePasswordComplete':
+		  clearInterval(intervalMenu)
+		
+			lcd.printLineSync(0, 'Change Passwd OK');
+			lcd.printLineSync(1, '      ...       ');
+
+			clearTimeout(timeoutMenu)
+			clearTimeout(alertTimeoutCount)
+			timeoutMenu = setTimeout(()=>{
+				task('maintenance-menu')
+			}, alertTimeoutCount*1000)	
+ 
+			alert = {
+				insertAt: new Date(),
+				event: 'Change password',
+				message: 'OK'
+			}
+			// console.log(alert)
+			nedb.alerts.insert(alert, function (err, newDoc) {   // Callback is optional
+			  console.log(err, newDoc)
+			});
+
+			// update setting
+			nedb.setting.update({ key: 'mainPassword' }, { $set: {value: passwordChangeAgain, updateBy: 'maintenance'} }, { upsert: true }, function (err, numReplaced) {
+			  console.log(err, numReplaced)
+			});
+
+		break;
 
 		case 'addCardId':
 		  clearInterval(intervalMenu)
@@ -2455,17 +2625,24 @@ const task = state => {
 		break;
 		case 'fill-full':
 			gStateLast = gState
+			fillTimeoutNow = fillTimeoutCount
+
+			--fillTimeoutNow
 			lcd.printLineSync(0, '  Fill to full  ');
-			lcd.printLineSync(1, '>>  Process   <<');			
+			// lcd.printLineSync(1, '>>  Process   <<');		
+			lcd.printLineSync(1, ('>  Process '+fillTimeoutNow).padEnd(14,' ')+'> ' );	
 
 			intervalMenu = setInterval(() => {
+				--fillTimeoutNow
 				if(blink) {
 					blink=false
-					lcd.printLineSync(1, '>>  Process   <<');
+					// lcd.printLineSync(1, '>>  Process   <<');
+					lcd.printLineSync(1, ('>  Process '+fillTimeoutNow).padEnd(14,' ')+'> ' );
 				}
 				else {
 					blink=true
-					lcd.printLineSync(1, ' >> Process  << ');
+					// lcd.printLineSync(1, ' >> Process  << ');
+					lcd.printLineSync(1, (' > Process '+fillTimeoutNow).padEnd(14,' ')+' >' );
 				}
 				
 			}, 1*1000)
@@ -2496,17 +2673,23 @@ const task = state => {
 		break;
 		case 'fill-bath':
 			gStateLast = gState
+			fillTimeoutNow = fillTimeoutCount
+
+			--fillTimeoutNow
 			lcd.printLineSync(0, ' Fill '+bathText.padStart(4, ' ')+' Bath ');
-			lcd.printLineSync(1, '>>  Process   <<');			
+			lcd.printLineSync(1, ('>  Process '+fillTimeoutNow).padEnd(14,' ')+'> ' );	
 
 			intervalMenu = setInterval(() => {
+				--fillTimeoutNow
 				if(blink) {
 					blink=false
-					lcd.printLineSync(1, '>>  Process   <<');
+					// lcd.printLineSync(1, '>>  Process   <<');
+					lcd.printLineSync(1, ('>  Process '+fillTimeoutNow).padEnd(14,' ')+'> ' );
 				}
 				else {
 					blink=true
-					lcd.printLineSync(1, ' >> Process  << ');
+					// lcd.printLineSync(1, ' >> Process  << ');
+					lcd.printLineSync(1, (' > Process '+fillTimeoutNow).padEnd(14,' ')+' >' );
 				}
 				
 			}, 1*1000)
@@ -2538,17 +2721,23 @@ const task = state => {
 		break;
 		case 'fill-litres':
 			gStateLast = gState
+			fillTimeoutNow = fillTimeoutCount
+
+			--fillTimeoutNow
 			lcd.printLineSync(0, 'Fill '+litresText.padStart(3, ' ')+' Litres ');
-			lcd.printLineSync(1, '>>  Process   <<');
+			lcd.printLineSync(1, ('>  Process '+fillTimeoutNow).padEnd(14,' ')+'> ' );	
 
 			intervalMenu = setInterval(() => {
+				--fillTimeoutNow
 				if(blink) {
 					blink=false
-					lcd.printLineSync(1, '>>  Process   <<');
+					// lcd.printLineSync(1, '>>  Process   <<');
+					lcd.printLineSync(1, ('>  Process '+fillTimeoutNow).padEnd(14,' ')+'> ' );
 				}
 				else {
 					blink=true
-					lcd.printLineSync(1, ' >> Process  << ');
+					// lcd.printLineSync(1, ' >> Process  << ');
+					lcd.printLineSync(1, (' > Process '+fillTimeoutNow).padEnd(14,' ')+' >' );
 				}
 				
 			}, 1*1000)
@@ -2948,9 +3137,10 @@ const task = state => {
 		break;
 
 		case 'Set fuel type':
+			cmdFuelTypeBuf = cmdFuelType
 			clearInterval(intervalMenu)
 			
-			lcd.printLineSync(0, 'Set fuel type> '+cmdFuelType);
+			lcd.printLineSync(0, 'Set fuel type> '+cmdFuelTypeBuf);
 			lcd.printLineSync(1, '1(D) 2(G)  OK(#)');
 
 			clearTimeout(timeoutMenu)
